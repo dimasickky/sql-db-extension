@@ -1,0 +1,53 @@
+{
+  "app_id": "sql-db",
+  "version": "1.0.0",
+  "capabilities": [],
+  "tools": [
+    {
+      "name": "tool_sql_db_chat",
+      "description": "SQL Database assistant — connect to MySQL/MariaDB databases, browse schema, run queries, explain execution plans, manage saved queries",
+      "scopes": ["*"],
+      "parameters": {
+        "message": {"type": "string", "required": false},
+        "kwargs": {"type": "string", "required": true}
+      }
+    },
+    {
+      "name": "skeleton_refresh_db_schema",
+      "description": "Background refresh: database schema cache for active connection.",
+      "scopes": ["sql-db.read"],
+      "parameters": {
+        "kwargs": {"type": "string", "required": true}
+      }
+    },
+    {
+      "name": "skeleton_alert_db",
+      "description": "Alert on schema changes.",
+      "scopes": ["sql-db.read"],
+      "parameters": {
+        "old": {"type": "string", "required": false},
+        "new": {"type": "string", "required": false},
+        "kwargs": {"type": "string", "required": true}
+      }
+    },
+    {
+      "name": "__panel__sidebar",
+      "description": "Panel: SQL DB",
+      "scopes": [],
+      "parameters": {
+        "params": {"type": "string", "required": true}
+      }
+    },
+    {
+      "name": "__panel__editor",
+      "description": "Panel: SQL Editor",
+      "scopes": [],
+      "parameters": {
+        "params": {"type": "string", "required": true}
+      }
+    }
+  ],
+  "signals": [],
+  "schedules": [],
+  "required_scopes": ["*", "sql-db.read", "sql-db.write"]
+}
