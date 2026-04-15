@@ -1,0 +1,206 @@
+"""sql-db · Shared state & extension setup."""
+from __future__ import annotations
+
+import logging
+import os
+
+import httpx
+
+from imperal_sdk import Extension
+from imperal_sdk.chat import ChatExtension, ActionResult
+
+log = logging.getLogger("sql-db")
+
+
+# ─── Config ───────────────────────────────────────────────────────────── #
+
+DB_SERVICE_URL = os.getenv("DB_SERVICE_URL", "http://66.78.41.10:8099")
+DB_SERVICE_KEY = os.getenv("DB_SERVICE_KEY", "")
+SQL_DB_ENCRYPTION_KEY = os.getenv("SQL_DB_ENCRYPTION_KEY", "")
+
+CONN_COLLECTION = "db_connections"
+
+
+# ─── Fernet (encrypt passwords before sending to backend) ─────────────── #
+
+_fernet = None
+
+
+def _get_fernet():
+    global _fernet
+    if _fernet is None:
+        from cryptography.fernet import Fernet
+        if not SQL_DB_ENCRYPTION_KEY:
+            raise RuntimeError("SQL_DB_ENCRYPTION_KEY not set")
+        _fernet = Fernet(SQL_DB_ENCRYPTION_KEY.encode())
+    return _fernet
+
+
+def encrypt_password(plaintext: str) -> str:
+    return _get_fernet().encrypt(plaintext.encode()).decode()
+
+
+# ─── HTTP ─────────────────────────────────────────────────────────────── #
+
+_http = None
+
+
+def _get_http() -> httpx.AsyncClient:
+    global _http
+    if _http is None:
+        _http = httpx.AsyncClient(
+            base_url=DB_SERVICE_URL,
+            headers={"x-api-key": DB_SERVICE_KEY},
+            timeout=30.0,
+        )
+    return _http
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────── #
+
+def _user_id(ctx) -> str:
+    return ctx.user.id if hasattr(ctx, "user") and ctx.user else ""
+
+
+def _tenant_id(ctx) -> str:
+    if hasattr(ctx, "user") and ctx.user and hasattr(ctx.user, "tenant_id"):
+        return ctx.user.tenant_id
+    return "default"
+
+
+def _extract_error(r: httpx.Response) -> dict:
+    """Extract error detail from a failed HTTP response."""
+    try:
+        body = r.json()
+        detail = body.get("detail", r.text)
+    except Exception:
+        detail = r.text or f"HTTP {r.status_code}"
+    return {"status": "error", "detail": detail}
+
+
+async def _api_post(path: str, data: dict) -> dict:
+    r = await _get_http().post(path, json=data)
+    if r.status_code >= 400:
+        return _extract_error(r)
+    return r.json()
+
+
+async def _api_get(path: str, params: dict = None) -> dict:
+    r = await _get_http().get(path, params=params or {})
+    if r.status_code >= 400:
+        return _extract_error(r)
+    return r.json()
+
+
+async def _api_delete(path: str, params: dict = None) -> dict:
+    r = await _get_http().delete(path, params=params or {})
+    if r.status_code >= 400:
+        return _extract_error(r)
+    return r.json()
+
+
+async def _api_patch(path: str, params: dict, data: dict) -> dict:
+    r = await _get_http().patch(path, params=params, json=data)
+    if r.status_code >= 400:
+        return _extract_error(r)
+    return r.json()
+
+
+# ─── Connection helpers ───────────────────────────────────────────────── #
+
+async def resolve_connection(ctx) -> tuple[dict | None, str]:
+    """Find active connection. Fallback: first connection of user.
+
+    Returns (conn_data, conn_id) or (None, "").
+    """
+    uid = _user_id(ctx)
+
+    # Try is_active filter first
+    try:
+        page = await ctx.store.query(
+            CONN_COLLECTION,
+            where={"user_id": uid, "is_active": True},
+            limit=1,
+        )
+        if page.data:
+            return page.data[0].data, page.data[0].id
+    except Exception:
+        pass
+
+    # Fallback: any connection for this user
+    try:
+        page = await ctx.store.query(
+            CONN_COLLECTION,
+            where={"user_id": uid},
+            limit=1,
+        )
+        if page.data:
+            return page.data[0].data, page.data[0].id
+    except Exception:
+        pass
+
+    return None, ""
+
+
+async def get_active_connection(ctx) -> dict | None:
+    """Get active connection data (or first available)."""
+    conn, _ = await resolve_connection(ctx)
+    return conn
+
+
+async def get_connection_by_id(ctx, conn_id: str) -> dict | None:
+    """Get a specific connection from ctx.store."""
+    doc = await ctx.store.get(CONN_COLLECTION, conn_id)
+    return doc.data if doc else None
+
+
+def build_conn_info(conn: dict) -> dict:
+    """Build ConnInfo dict for backend requests."""
+    return {
+        "host": conn["host"],
+        "port": conn.get("port", 3306),
+        "user": conn["db_user"],
+        "password_encrypted": conn["password_encrypted"],
+        "database": conn.get("database", ""),
+    }
+
+
+# ─── System Prompt ────────────────────────────────────────────────────── #
+
+from pathlib import Path as _Path
+SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
+
+
+# ─── Extension ────────────────────────────────────────────────────────── #
+
+ext = Extension("sql-db", version="1.0.0")
+
+chat = ChatExtension(
+    ext=ext,
+    tool_name="tool_sql_db_chat",
+    description=(
+        "SQL Database assistant — connect to MySQL/MariaDB databases, "
+        "browse schema, run queries, explain plans, manage saved queries"
+    ),
+    system_prompt=SYSTEM_PROMPT,
+    model="claude-haiku-4-5-20251001",
+)
+
+
+# ─── Health Check ─────────────────────────────────────────────────────── #
+
+@ext.health_check
+async def health(ctx) -> dict:
+    try:
+        r = await _get_http().get("/health")
+        data = r.json()
+        return {"status": "ok", "version": ext.version, "backend": data.get("status")}
+    except Exception:
+        return {"status": "degraded", "version": ext.version, "backend": "unreachable"}
+
+
+# ─── Lifecycle ────────────────────────────────────────────────────────── #
+
+@ext.on_install
+async def on_install(ctx):
+    log.info("sql-db installed for user %s", _user_id(ctx))
