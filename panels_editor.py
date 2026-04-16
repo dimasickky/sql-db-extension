@@ -36,6 +36,15 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
     log.info("sql_editor called: tab=%s action=%s sql=%r note_id=%s table=%s mode=%s",
              tab, action, sql[:50] if sql else "", note_id, table, mode)
 
+    # Cross-panel ui.Call (sidebar → center editor) drops the `tab` param —
+    # only `section`/`active` travel reliably per Panel Shell semantics. We
+    # land with tab="editor" (the default) even when the caller sent
+    # tab="results". If sql + action are provided, infer the intent was to
+    # execute → promote to "results" tab so the user sees their output.
+    if (tab in ("editor", "") and sql
+            and action in ("run", "explain", "dry_run")):
+        tab = "results"
+
     # DataTable on_row_click passes the clicked row as a nested `row` dict
     # in kwargs. When navigating from the results table to row_form edit, the
     # pk_value is not in the Call params — we pull it from the row dict.
@@ -153,11 +162,23 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
 # ─── SQL Form ─────────────────────────────────────────────────────────── #
 
 def _append_form(children: list, sql: str, conn_id: str, action: str) -> None:
-    """SQL input form with action selector."""
+    """SQL input form with action selector.
+
+    `sql` and `action` are placed into Form `defaults` (not only on the child
+    components). FormContext only registers a child value after the user
+    edits it — so the pre-filled TextArea `value=` doesn't travel on submit
+    by itself. Putting them into `defaults` guarantees submission, and the
+    Select/TextArea `value=` props are still used for the visual display.
+    """
     children.append(ui.Form(
         action="__panel__editor",
         submit_label="Execute",
-        defaults={"note_id": conn_id, "tab": "results"},
+        defaults={
+            "note_id": conn_id,
+            "tab": "results",
+            "sql": sql,
+            "action": action,
+        },
         children=[
             ui.Text("Action", variant="caption"),
             ui.Select(
