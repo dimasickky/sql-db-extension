@@ -6,6 +6,77 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.1.0] — 2026-04-16
+
+Row-level CRUD in the panel UI. No more raw-SQL-only for simple edits.
+
+### Added
+
+#### Clickable schema (sidebar)
+
+- Schema `ui.Tree` replaced with expandable `ui.List` — each table is a clickable `ListItem` (`expandable=True`, columns in `expanded_content`)
+- Click a table → `SELECT * FROM \`table\` LIMIT 200` runs in the editor's results tab (zero typing)
+- Secondary "Open in Editor" action per table — loads the SELECT into the editor tab without executing
+- Primary-key columns highlighted with `"Key"` icon + yellow `"PK"` badge in the column list
+
+#### Row Form tab (`tab=row_form`)
+
+- New `__panel__editor` tab `row_form` — type-aware Insert/Edit form rendered from `/schema` introspection
+- Mode `insert` — empty form, all columns editable, auto-increment PKs auto-skipped
+- Mode `edit` — current row fetched (SELECT by PK), values pre-filled via `ui.Form(defaults=...)`
+- Input type per column: `ui.Toggle` for boolean/`tinyint(1)`, `ui.TextArea` for TEXT/BLOB/JSON, `ui.Input` otherwise
+- Column labels carry `(type · PK · NOT NULL · auto)` hints
+- Composite / no-PK tables → `ui.Alert` "no primary key — edit and delete disabled"
+- Delete button (edit mode) with confirm → dispatches to `delete_row` chat handler
+- Back-to-Browse button returns to results tab with the original `SELECT *`
+
+#### Row click interactivity (results tab)
+
+- `ui.DataTable` in results gets `on_row_click` when the SQL is a simple single-table SELECT and a PK is detected
+- Click a row → opens `row_form` in edit mode for that PK value
+- Detection: regex `^SELECT .+? FROM <ident>` + rejection of `JOIN` / `UNION` anywhere in the statement
+- "Insert new row into `<table>`" button rendered above the DataTable for every single-table SELECT
+- Row `id` = PK value when detectable — so `on_row_click` delivers the correct row via the `row` dict convention
+
+#### Chat functions (`handlers_rows.py`)
+
+- `insert_row` (action_type=write, event=`row.inserted`) — parameterized INSERT via `/v1/connections/{id}/row`
+- `update_row` (action_type=write, event=`row.updated`) — parameterized UPDATE with WHERE pk=value, `LIMIT 1`
+- `delete_row` (action_type=destructive, event=`row.deleted`) — parameterized DELETE with `LIMIT 1`
+- Values travel as JSON strings (`values_json`) and are parsed server-side; no SQL-string assembly anywhere
+
+#### Backend endpoint (db-service v1.1.0)
+
+- `POST /v1/connections/{conn_id}/row` — single endpoint for all three row operations
+- Identifiers (table + column names) validated against `^[A-Za-z_][A-Za-z0-9_]*$` and backtick-escaped
+- Values bound via `aiomysql` `%s` placeholders — never interpolated
+- UPDATE/DELETE refuse empty WHERE (explicit guard, not just a missing clause)
+- `LIMIT 1` on UPDATE/DELETE — defence in depth against PK collisions
+- Audit row in `query_history` per call (`sql_text="[row.insert] table"`, truncated)
+
+### Changed
+
+- `panels_editor.py` split for maintainability:
+  - `panels_editor.py` — tab dispatcher + SQL form (was 440L, now ~150L)
+  - `panels_editor_results.py` — `run_and_show` (execute + render for run/explain/dry_run)
+  - `panels_editor_tabs.py` — History + Saved renderers
+  - `panels_editor_row_form.py` — row_form tab + form submit processor
+  - `sql_parser.py` — pure `split_statements` + `classify_sql` (no UI, no I/O)
+- `main.py` — cleanup list + imports extended for new modules
+- Sidebar `refresh="on_event:..."` now subscribes to `row.inserted,row.updated,row.deleted,sql.executed` in addition to connection events
+- Editor panel `refresh="on_event:row.inserted,row.updated,row.deleted"` — so the results tab reloads after saves
+
+### Fixed
+
+- Schema `ui.Tree` nodes were not clickable (SDK `ui.Tree` exposes no `on_click`) — replaced with `ui.List` of `ui.ListItem` which supports `on_click`. This closes one of the P0 known issues in the extension doc.
+
+### Security
+
+- `/row` endpoint — full parameterization, identifier whitelist, WHERE-required guard. SQL injection attempts via `table`/`column` names rejected at 400 with explicit error
+- Smoke-tested 2026-04-16: `table="users; DROP TABLE x; --"` → 400, `operation=update` with empty `where` → 400, `column="name; DROP"` → 400
+
+---
+
 ## [1.0.0] — 2026-04-15
 
 Initial release — production-ready end-to-end SQL workbench.

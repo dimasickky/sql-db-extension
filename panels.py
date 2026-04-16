@@ -1,4 +1,4 @@
-"""sql-db · Sidebar panel (left) — connections + schema tree."""
+"""sql-db · Sidebar panel (left) — connections + clickable schema."""
 from __future__ import annotations
 
 import logging
@@ -13,10 +13,11 @@ log = logging.getLogger("sql-db")
 @ext.panel(
     "sidebar", slot="left", title="SQL DB", icon="Database",
     default_width=260, min_width=200, max_width=400,
-    refresh="on_event:connection.added,connection.deleted,connection.selected",
+    refresh="on_event:connection.added,connection.deleted,connection.selected,"
+            "row.inserted,row.updated,row.deleted,sql.executed",
 )
 async def sql_sidebar(ctx, active_conn_id: str = "", view: str = "main", **kwargs):
-    """Sidebar: connection list + schema tree."""
+    """Sidebar: connection list + clickable schema (tables → SELECT in editor)."""
     uid = _user_id(ctx)
     children: list = []
 
@@ -97,7 +98,7 @@ async def sql_sidebar(ctx, active_conn_id: str = "", view: str = "main", **kwarg
         children.append(ui.Divider(f"Connections ({len(conn_items)})"))
         children.append(ui.List(items=conn_items))
 
-    # ── Schema tree for active connection ─────────────────────────────
+    # ── Clickable schema for active connection ────────────────────────
     if active_doc:
         conn = active_doc.data
         database = conn.get("database", "")
@@ -111,24 +112,70 @@ async def sql_sidebar(ctx, active_conn_id: str = "", view: str = "main", **kwarg
                      "connection": build_conn_info(conn)},
                 )
                 tables = result.get("tables", [])
-                tree_nodes = []
-                for t in tables[:40]:
-                    col_children = [
-                        {"id": f"{t['name']}.{c.get('COLUMN_NAME', '')}",
-                         "label": f"{c.get('COLUMN_NAME', '')} ({c.get('COLUMN_TYPE', '')})",
-                         "icon": "Key" if c.get("COLUMN_KEY") == "PRI" else "Columns"}
-                        for c in t.get("columns", [])[:30]
-                    ]
-                    tree_nodes.append({
-                        "id": t["name"],
-                        "label": f"{t['name']} ({t.get('rows', '?')})",
-                        "icon": "Table",
-                        "children": col_children,
-                    })
-                children.append(ui.Tree(nodes=tree_nodes))
+                table_items = _build_table_items(active_id, tables)
+                if table_items:
+                    children.append(ui.List(items=table_items))
+                else:
+                    children.append(ui.Empty(message="No tables", icon="Table"))
             except Exception as e:
                 children.append(ui.Alert(
                     title="Schema error", message=str(e), type="warning",
                 ))
 
     return ui.Stack(children=children, gap=2, className="min-h-full")
+
+
+# ─── Schema item builder ──────────────────────────────────────────────── #
+
+def _build_table_items(conn_id: str, tables: list[dict]) -> list:
+    """Build ListItems for tables: click = SELECT *, expand = show columns."""
+    items = []
+    for t in tables[:60]:
+        name = t.get("name", "")
+        if not name:
+            continue
+
+        row_count = t.get("rows", "?")
+        columns = t.get("columns", [])[:50]
+
+        # Backtick-escape table name for MariaDB identifiers
+        quoted = f"`{name}`"
+        select_sql = f"SELECT * FROM {quoted} LIMIT 200"
+
+        # Expanded content: column list with PK highlight
+        col_items = []
+        for c in columns:
+            col_name = c.get("COLUMN_NAME", "")
+            col_type = c.get("COLUMN_TYPE", "")
+            col_key = c.get("COLUMN_KEY", "")
+            is_pk = col_key == "PRI"
+            col_items.append(ui.ListItem(
+                id=f"{name}.{col_name}",
+                title=col_name,
+                subtitle=col_type,
+                icon="Key" if is_pk else "Columns",
+                badge=ui.Badge("PK", color="yellow") if is_pk else None,
+            ))
+
+        items.append(ui.ListItem(
+            id=name,
+            title=name,
+            subtitle=f"{row_count} row(s)" if row_count != "?" else "",
+            icon="Table",
+            on_click=ui.Call(
+                "__panel__editor",
+                note_id=conn_id, tab="results", action="run", sql=select_sql,
+            ),
+            expandable=True,
+            expanded_content=[ui.List(items=col_items)] if col_items else None,
+            actions=[
+                {"icon": "Code",
+                 "label": "Open in Editor",
+                 "on_click": ui.Call(
+                     "__panel__editor",
+                     note_id=conn_id, tab="editor", sql=select_sql,
+                 )},
+            ],
+        ))
+
+    return items
