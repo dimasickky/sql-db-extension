@@ -33,8 +33,9 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
     """SQL editor — self-contained. Executes queries and shows results in-panel."""
     uid = _user_id(ctx)
 
-    log.info("sql_editor called: tab=%s action=%s sql=%r note_id=%s table=%s mode=%s",
-             tab, action, sql[:50] if sql else "", note_id, table, mode)
+    log.info("sql_editor called: tab=%s action=%s sql=%r note_id=%s table=%s mode=%s kwargs=%s",
+             tab, action, sql[:50] if sql else "", note_id, table, mode,
+             list(kwargs.keys()) + [f"{k}={v!r}" for k, v in kwargs.items()][:6])
 
     # Cross-panel ui.Call (sidebar → center editor) drops the `tab` param —
     # only `section`/`active` travel reliably per Panel Shell semantics. We
@@ -49,6 +50,14 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
             and action in ("run", "explain", "dry_run")
             and kwargs.get("edit") not in ("1", 1, True, "true")):
         tab = "results"
+
+    # Defensive: if an empty tab=results call arrives (mystery re-renders
+    # observed in prod — likely Shell auto-refetch on mount), fall back to
+    # the editor tab instead of showing "No SQL" which replaces the real
+    # DataTable that was just rendered. The editor tab with empty sql
+    # renders the SQL input form — a safe default state.
+    if tab == "results" and not sql:
+        tab = "editor"
 
     # DataTable on_row_click passes the clicked row as a nested `row` dict
     # in kwargs. When navigating from the results table to row_form edit, the
