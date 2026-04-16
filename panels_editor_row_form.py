@@ -198,8 +198,11 @@ async def append_row_form(
         raw_val = current_row.get(col_name, "") if mode == "edit" else ""
         form_children.extend(_render_input(col, "" if raw_val is None else str(raw_val)))
 
-    # Hidden fields: table, pk_col, pk_value — passed via defaults
-    submit_action = "__panel__editor_row_save"  # dispatcher (see below)
+    # Routing params (tab/mode/table/pk) + column defaults.
+    # Column values go into defaults because FormContext only registers a
+    # child after the user edits it — pre-filled TextArea/Input/Toggle
+    # `value=` props don't travel on submit otherwise. Putting current row
+    # values in defaults guarantees untouched edit-mode fields submit.
     form_defaults = {
         "note_id": conn_id,
         "table": table,
@@ -209,6 +212,15 @@ async def append_row_form(
     if mode == "edit":
         form_defaults["pk_col"] = effective_pk
         form_defaults["pk_value"] = pk_value
+        for col in columns:
+            col_name = col.get("COLUMN_NAME", "")
+            extra = col.get("EXTRA", "")
+            if "auto_increment" in extra.lower():
+                continue  # auto PK — never submitted as a column value
+            raw_val = current_row.get(col_name)
+            form_defaults[f"col__{col_name}"] = (
+                "" if raw_val is None else str(raw_val)
+            )
 
     children.append(ui.Form(
         action="__panel__editor",
