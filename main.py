@@ -1,4 +1,7 @@
-"""sql-db v1.1.0 · SQL Database assistant with schema browsing + query execution + row CRUD."""
+"""sql-db v1.1.0 · SQL Database assistant with schema browsing + query execution + row CRUD.
+
+Build: 2026-04-16 ghost-hunt
+"""
 from __future__ import annotations
 
 import sys, os
