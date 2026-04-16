@@ -128,7 +128,14 @@ async def sql_sidebar(ctx, active_conn_id: str = "", view: str = "main", **kwarg
 # ─── Schema item builder ──────────────────────────────────────────────── #
 
 def _build_table_items(conn_id: str, tables: list[dict]) -> list:
-    """Build ListItems for tables: click = SELECT *, expand = show columns."""
+    """Build ListItems for tables — click = SELECT * (runs immediately).
+
+    IMPORTANT: do NOT set expandable=True. DList.tsx handleClick only fires
+    on_click when !isExpandable — expandable items toggle expansion and
+    swallow the click action entirely. Column details live in the DataTable
+    headers of the resulting query; the 'Code' hover action loads the SQL
+    into the editor without executing.
+    """
     items = []
     for t in tables[:60]:
         name = t.get("name", "")
@@ -136,44 +143,42 @@ def _build_table_items(conn_id: str, tables: list[dict]) -> list:
             continue
 
         row_count = t.get("rows", "?")
-        columns = t.get("columns", [])[:50]
+        columns = t.get("columns", [])
 
         # Backtick-escape table name for MariaDB identifiers
         quoted = f"`{name}`"
         select_sql = f"SELECT * FROM {quoted} LIMIT 200"
 
-        # Expanded content: column list with PK highlight
-        col_items = []
-        for c in columns:
-            col_name = c.get("COLUMN_NAME", "")
-            col_type = c.get("COLUMN_TYPE", "")
-            col_key = c.get("COLUMN_KEY", "")
-            is_pk = col_key == "PRI"
-            col_items.append(ui.ListItem(
-                id=f"{name}.{col_name}",
-                title=col_name,
-                subtitle=col_type,
-                icon="Key" if is_pk else "Columns",
-                badge=ui.Badge("PK", color="yellow") if is_pk else None,
-            ))
+        pk_col = next(
+            (c.get("COLUMN_NAME", "") for c in columns if c.get("COLUMN_KEY") == "PRI"),
+            "",
+        )
+        col_count = len(columns)
+
+        subtitle_parts = []
+        if row_count not in ("?", None):
+            subtitle_parts.append(f"{row_count} rows")
+        if col_count:
+            subtitle_parts.append(f"{col_count} cols")
+        if pk_col:
+            subtitle_parts.append(f"PK: {pk_col}")
 
         items.append(ui.ListItem(
             id=name,
             title=name,
-            subtitle=f"{row_count} row(s)" if row_count != "?" else "",
+            subtitle=" · ".join(subtitle_parts),
             icon="Table",
             on_click=ui.Call(
                 "__panel__editor",
                 note_id=conn_id, tab="results", action="run", sql=select_sql,
             ),
-            expandable=True,
-            expanded_content=[ui.List(items=col_items)] if col_items else None,
             actions=[
                 {"icon": "Code",
                  "label": "Open in Editor",
                  "on_click": ui.Call(
                      "__panel__editor",
-                     note_id=conn_id, tab="editor", sql=select_sql,
+                     note_id=conn_id, tab="editor", action="run", sql=select_sql,
+                     edit="1",  # bypass auto-promote — user wants editor, not results
                  )},
             ],
         ))
