@@ -41,8 +41,13 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
     # land with tab="editor" (the default) even when the caller sent
     # tab="results". If sql + action are provided, infer the intent was to
     # execute → promote to "results" tab so the user sees their output.
+    #
+    # Sentinel `edit=1` bypasses auto-promote — sent by "Edit this SQL"
+    # buttons in results/history/saved tabs that WANT tab="editor" with
+    # the SQL pre-filled for modification.
     if (tab in ("editor", "") and sql
-            and action in ("run", "explain", "dry_run")):
+            and action in ("run", "explain", "dry_run")
+            and kwargs.get("edit") not in ("1", 1, True, "true")):
         tab = "results"
 
     # DataTable on_row_click passes the clicked row as a nested `row` dict
@@ -114,6 +119,11 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
     children = [action_bar, nav_tabs]
 
     if tab == "results":
+        # Results tab: show DataTable + "Edit this SQL" navigation button.
+        # The SQL form is intentionally NOT rendered here — it would stay
+        # mounted across tab changes (useState(defaults) persists) and
+        # submit stale values. User clicks "Edit this SQL" to go back to
+        # tab=editor where the Form mounts fresh from current sql.
         if sql:
             statements = split_statements(sql)
             if len(statements) > 1:
@@ -122,26 +132,64 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
                     message=f"Action: {action} · executing sequentially…",
                     type="info",
                 ))
-            # Add "Insert new row" button above results if the SQL is a simple
-            # single-table SELECT (detected by run_and_show), so renderer passes
-            # back the table name.
             for i, stmt in enumerate(statements, 1):
                 if len(statements) > 1:
                     children.append(ui.Divider(f"[{i}/{len(statements)}] {stmt[:60]}…"))
                 await run_and_show(children, uid, conn_id, conn_data, stmt, action)
+
+            children.append(ui.Divider())
+            children.append(ui.Stack([
+                ui.Button(
+                    "Edit this SQL", icon="Pencil",
+                    variant="primary", size="sm",
+                    on_click=ui.Call(
+                        "__panel__editor",
+                        note_id=conn_id, tab="editor", action=action, sql=sql,
+                        edit="1",  # bypass auto-promote to results
+                    ),
+                ),
+                ui.Button(
+                    "New query", icon="Plus",
+                    variant="ghost", size="sm",
+                    on_click=ui.Call(
+                        "__panel__editor",
+                        note_id=conn_id, tab="editor", action="run", sql="",
+                    ),
+                ),
+            ], direction="horizontal", gap=2))
         else:
             children.append(ui.Alert(
                 title="No SQL",
-                message="Type SQL in the editor and press Run.",
-                type="warning",
+                message="Use the Editor tab to type a query, or click a table in the sidebar.",
+                type="info",
             ))
-        _append_form(children, sql or "", conn_id, action)
+            children.append(ui.Button(
+                "Open Editor", icon="Code", variant="primary", size="sm",
+                on_click=ui.Call(
+                    "__panel__editor",
+                    note_id=conn_id, tab="editor", action="run", sql="",
+                ),
+            ))
     elif tab == "history":
         await append_history(children, uid, conn_id)
-        _append_form(children, "", conn_id, "run")
+        children.append(ui.Divider())
+        children.append(ui.Button(
+            "Open Editor", icon="Code", variant="primary", size="sm",
+            on_click=ui.Call(
+                "__panel__editor",
+                note_id=conn_id, tab="editor", action="run", sql="",
+            ),
+        ))
     elif tab == "saved":
         await append_saved(children, uid, conn_id)
-        _append_form(children, "", conn_id, "run")
+        children.append(ui.Divider())
+        children.append(ui.Button(
+            "Open Editor", icon="Code", variant="primary", size="sm",
+            on_click=ui.Call(
+                "__panel__editor",
+                note_id=conn_id, tab="editor", action="run", sql="",
+            ),
+        ))
     elif tab == "row_form":
         await append_row_form(
             children, ctx, uid, conn_id, conn_data,
