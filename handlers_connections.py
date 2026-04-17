@@ -50,6 +50,7 @@ class SelectConnectionParams(BaseModel):
     description="Add a new MySQL/MariaDB connection. Tests before saving.",
 )
 async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
+    """Add a new MySQL/MariaDB connection. Tests before saving."""
     uid = _user_id(ctx)
     try:
         pwd_enc = encrypt_password(params.password)
@@ -108,6 +109,7 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
     description="List all saved database connections.",
 )
 async def fn_list_connections(ctx) -> ActionResult:
+    """List all saved database connections."""
     uid = _user_id(ctx)
     try:
         page = await ctx.store.query(CONN_COLLECTION, where={"user_id": uid}, limit=100)
@@ -133,6 +135,7 @@ async def fn_list_connections(ctx) -> ActionResult:
     description="Test an existing connection.",
 )
 async def fn_test_connection(ctx, params: ConnectionIdParams) -> ActionResult:
+    """Test an existing connection."""
     try:
         conn = await get_connection_by_id(ctx, params.connection_id)
         if not conn:
@@ -158,6 +161,7 @@ async def fn_test_connection(ctx, params: ConnectionIdParams) -> ActionResult:
     description="Switch active connection.",
 )
 async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionResult:
+    """Switch active connection."""
     uid = _user_id(ctx)
     try:
         target = await get_connection_by_id(ctx, params.connection_id)
@@ -184,6 +188,7 @@ async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionRes
     description="Delete a saved connection.",
 )
 async def fn_delete_connection(ctx, params: ConnectionIdParams) -> ActionResult:
+    """Delete a saved connection."""
     try:
         conn = await get_connection_by_id(ctx, params.connection_id)
         if not conn:

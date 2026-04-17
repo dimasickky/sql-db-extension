@@ -21,6 +21,7 @@ class NlToSqlParams(BaseModel):
     description="Convert a natural language question to SQL using the database schema.",
 )
 async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
+    """Convert a natural language question to SQL using the database schema."""
     try:
         from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
