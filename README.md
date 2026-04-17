@@ -7,7 +7,7 @@
 **Connect. Query. Explore. — in plain English or pure SQL.**
 
 [![Platform](https://img.shields.io/badge/platform-Imperal%20Cloud-blue)](https://imperal.io)
-[![SDK](https://img.shields.io/badge/imperal--sdk-1.5.3-blue)](https://pypi.org/project/imperal-sdk/)
+[![SDK](https://img.shields.io/badge/imperal--sdk-1.5.6-blue)](https://pypi.org/project/imperal-sdk/)
 [![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)]()
 [![License](https://img.shields.io/badge/license-LGPL--3.0-blue)](LICENSE)
 
@@ -180,10 +180,12 @@ The extension reads these env vars on the Imperal Platform Worker:
 
 ## Development
 
-Built with [Imperal SDK](https://github.com/imperalcloud/imperal-sdk) v1.5.3.
+Built with [Imperal SDK](https://github.com/imperalcloud/imperal-sdk) v1.5.6.
 
 ```bash
-pip install imperal-sdk==1.5.3
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 imperal validate
 imperal dev
 ```
