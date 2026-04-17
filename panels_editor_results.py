@@ -163,8 +163,24 @@ def _render_paginator(
     ], direction="horizontal", gap=2))
 
 
+async def _pulse_sql_executed(ctx) -> None:
+    """Emit sql.executed so the sidebar schema re-fetches row counts.
+
+    Panel Execute bypasses @chat.function, so kernel auto-event-publishing
+    doesn't fire. We nudge it via a tiny internal function that has
+    event="sql.executed" on its decorator. Failures are swallowed — the
+    event is a UX nicety, never load-bearing.
+    """
+    try:
+        if hasattr(ctx, "extensions") and ctx.extensions is not None:
+            await ctx.extensions.call("sql-db", "_pulse_sql_executed",
+                                      {"kind": "editor_dml"})
+    except Exception as e:
+        log.debug("sql.executed pulse skipped: %s", e)
+
+
 async def run_and_show(
-    children: list, uid: str, conn_id: str, conn_data: dict, sql: str, action: str,
+    children: list, ctx, uid: str, conn_id: str, conn_data: dict, sql: str, action: str,
     page: int = 0, page_size: int = 50, paginate: bool = False,
 ) -> None:
     """Execute SQL with given action (run/explain/dry_run) and render result.
@@ -390,3 +406,5 @@ async def run_and_show(
             message=f"{affected} row(s) affected · {exec_ms}ms",
             type="success",
         ))
+        # Panel-direct DML — nudge sidebar so row counts re-fetch.
+        await _pulse_sql_executed(ctx)

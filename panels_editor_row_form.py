@@ -332,4 +332,16 @@ async def process_row_form_submit(
         msg = f"Updated {affected} row(s)"
 
     children.append(ui.Alert(title="Saved", message=msg, type="success"))
+
+    # Row form DML also bypasses @chat.function — pulse the sidebar event
+    # the same way the SQL Editor's Execute path does.
+    try:
+        if hasattr(ctx, "extensions") and ctx.extensions is not None:
+            await ctx.extensions.call(
+                "sql-db", "_pulse_sql_executed",
+                {"kind": f"row_form_{mode}"},
+            )
+    except Exception as e:
+        log.debug("sql.executed pulse skipped: %s", e)
+
     _append_back_button(children, conn_id, table)
