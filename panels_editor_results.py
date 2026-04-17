@@ -97,11 +97,21 @@ async def _fetch_total_rows(
         return -1
 
 
+_PAGE_SIZE_OPTIONS = [
+    {"value": "10", "label": "10 / page"},
+    {"value": "25", "label": "25 / page"},
+    {"value": "50", "label": "50 / page"},
+    {"value": "100", "label": "100 / page"},
+    {"value": "200", "label": "200 / page"},
+    {"value": "500", "label": "500 / page"},
+]
+
+
 def _render_paginator(
     children: list, conn_id: str, base_sql: str, action: str,
     page: int, page_size: int, total_rows: int,
 ) -> None:
-    """Render Previous / Next buttons + Page N of M text."""
+    """Render Previous / Next buttons + Page N of M text + page size selector."""
     if total_rows < 0:
         return  # no count → skip paginator
     total_pages = max((total_rows + page_size - 1) // page_size, 1)
@@ -135,6 +145,19 @@ def _render_paginator(
                 note_id=conn_id, tab="results", action=action,
                 sql=base_sql,
                 page=str(page + 1), page_size=str(page_size),
+            ),
+        ),
+        # Page-size selector. on_change injects the new value under the
+        # `page_size` key; page is reset to 0 so the user doesn't land on
+        # an out-of-range offset after shrinking the window.
+        ui.Select(
+            param_name="page_size",
+            value=str(page_size),
+            options=_PAGE_SIZE_OPTIONS,
+            on_change=ui.Call(
+                "__panel__editor",
+                note_id=conn_id, tab="results", action=action,
+                sql=base_sql, page="0",
             ),
         ),
     ], direction="horizontal", gap=2))

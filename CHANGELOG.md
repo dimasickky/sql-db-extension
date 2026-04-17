@@ -19,6 +19,7 @@ Real pagination on browse — use case: tables with thousands of rows.
   - Run a separate `SELECT COUNT(*)` to know the total
   - Render an Alert "Showing rows X-Y of N"
   - Render Previous / Next buttons + "Page N of M · N row(s) total" caption
+  - Render a page-size `ui.Select` (10 / 25 / 50 / 100 / 200 / 500) — switching resets page to 0
 - Page size capped 5..500. Multi-statement runs skip pagination (each statement gets default 200).
 
 ### Changed
