@@ -1,4 +1,4 @@
-"""sql-db v1.2.0 · SQL Database assistant with schema browsing + query execution + row CRUD + pagination."""
+"""sql-db v1.2.1 · pagination + sidebar-refresh pulse on panel DML."""
 from __future__ import annotations
 
 import sys, os

@@ -13,6 +13,31 @@ from pydantic import BaseModel, Field
 from app import chat, ActionResult, _api_post, _user_id, build_conn_info
 
 
+# ─── Event pulse (internal) ───────────────────────────────────────────── #
+
+class PulseParams(BaseModel):
+    """Side-channel to make the kernel publish `sql-db.sql.executed`.
+
+    Called via `ctx.extensions.call(...)` from panel handlers that ran DML
+    through `/execute` or `/row` directly — those bypass @chat.function, so
+    the kernel has no way to emit the event automatically. This tiny
+    write-typed function gives it a hook.
+    """
+    kind: str = Field(default="dml", description="Origin marker for debugging")
+
+
+@chat.function(
+    "_pulse_sql_executed", action_type="write", event="sql.executed",
+    description=(
+        "Internal side-channel: emit sql.executed after a panel-direct DML "
+        "so the sidebar schema refreshes. Do not call from chat — for "
+        "extension-internal use only."
+    ),
+)
+async def fn_pulse_sql_executed(ctx, params: PulseParams) -> ActionResult:
+    return ActionResult.success(data={"kind": params.kind}, summary="")
+
+
 # ─── Models ───────────────────────────────────────────────────────────── #
 
 class InsertRowParams(BaseModel):

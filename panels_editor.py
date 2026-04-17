@@ -156,7 +156,7 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
                 if multi:
                     children.append(ui.Divider(f"[{i}/{len(statements)}] {stmt[:60]}…"))
                 await run_and_show(
-                    children, uid, conn_id, conn_data, stmt, action,
+                    children, ctx, uid, conn_id, conn_data, stmt, action,
                     page=(0 if multi else page_i),
                     page_size=(200 if multi else page_size_i),
                     paginate=(not multi),
