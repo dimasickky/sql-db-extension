@@ -14,7 +14,7 @@ log = logging.getLogger("sql-db")
 
 # ─── Config ───────────────────────────────────────────────────────────── #
 
-DB_SERVICE_URL = os.getenv("DB_SERVICE_URL", "http://66.78.41.10:8099")
+DB_SERVICE_URL = os.environ["DB_SERVICE_URL"]
 DB_SERVICE_KEY = os.getenv("DB_SERVICE_KEY", "")
 SQL_DB_ENCRYPTION_KEY = os.getenv("SQL_DB_ENCRYPTION_KEY", "")
 

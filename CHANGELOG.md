@@ -162,7 +162,7 @@ Initial release — production-ready end-to-end SQL workbench.
 
 #### History & Saved (`handlers_history.py`)
 
-- `list_history` — recent queries per connection (stored in internal Galera DB)
+- `list_history` — recent queries per connection (stored server-side in the hosted backend DB)
 - `save_query`, `list_saved`, `run_saved`, `delete_saved`
 
 #### Skeleton (`skeleton.py`)
