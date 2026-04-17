@@ -1,9 +1,12 @@
 """sql-db · Editor panel — Run/Explain/DryRun execution + result rendering.
 
-If the executed SQL is a simple single-table SELECT (no JOIN/UNION/subquery)
-and the target table has a single primary key, result rows become clickable:
-click → opens the row_form tab in edit mode. An "Insert new row" button is
-rendered above the DataTable.
+Single-table browse enhancements:
+- If the executed SQL is a simple single-table SELECT (no JOIN/UNION) and the
+  target table has a single primary key, result rows become clickable (click
+  → row_form edit). An "Insert new row" button is rendered above the DataTable.
+- When called with `paginate=True`, the SQL's existing LIMIT/OFFSET are stripped
+  and replaced with page-based ones; a COUNT(*) query fetches the total; and
+  Previous / Next / "Page N of M" controls are rendered.
 """
 from __future__ import annotations
 
@@ -24,6 +27,12 @@ _SINGLE_TABLE_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+# Strip trailing LIMIT [offset,] n  OR  LIMIT n OFFSET m at the end.
+_LIMIT_TAIL_RE = re.compile(
+    r"\s+LIMIT\s+\d+(?:\s*,\s*\d+|\s+OFFSET\s+\d+)?\s*;?\s*$",
+    re.IGNORECASE,
+)
+
 
 def _detect_single_table(sql: str) -> str:
     """Return table name for simple single-table SELECT; else ''."""
@@ -32,6 +41,11 @@ def _detect_single_table(sql: str) -> str:
         return ""
     m = _SINGLE_TABLE_RE.match(sql)
     return m.group(1) if m else ""
+
+
+def _strip_trailing_limit(sql: str) -> str:
+    """Remove a trailing LIMIT/OFFSET clause so we can re-add page-based ones."""
+    return _LIMIT_TAIL_RE.sub("", sql).rstrip(";").strip()
 
 
 async def _fetch_pk_column(
@@ -59,10 +73,83 @@ async def _fetch_pk_column(
     return ""
 
 
+async def _fetch_total_rows(
+    uid: str, conn_id: str, conn_data: dict, table: str,
+) -> int:
+    """Run SELECT COUNT(*) for pagination total; return -1 on failure."""
+    try:
+        result = await _api_post(f"/v1/connections/{conn_id}/query", {
+            "user_id": uid,
+            "sql": f"SELECT COUNT(*) AS cnt FROM `{table}`",
+            "limit": 1,
+            "connection": build_conn_info(conn_data),
+        })
+    except Exception:
+        return -1
+    if result.get("status") == "error":
+        return -1
+    rows = result.get("rows", [])
+    if not rows:
+        return -1
+    try:
+        return int(rows[0].get("cnt", -1))
+    except (TypeError, ValueError):
+        return -1
+
+
+def _render_paginator(
+    children: list, conn_id: str, base_sql: str, action: str,
+    page: int, page_size: int, total_rows: int,
+) -> None:
+    """Render Previous / Next buttons + Page N of M text."""
+    if total_rows < 0:
+        return  # no count → skip paginator
+    total_pages = max((total_rows + page_size - 1) // page_size, 1)
+    has_prev = page > 0
+    has_next = page + 1 < total_pages
+
+    children.append(ui.Stack([
+        ui.Button(
+            "Previous", icon="ChevronLeft",
+            variant="ghost" if has_prev else "primary",
+            size="sm",
+            disabled=not has_prev,
+            on_click=ui.Call(
+                "__panel__editor",
+                note_id=conn_id, tab="results", action=action,
+                sql=base_sql,
+                page=str(max(page - 1, 0)), page_size=str(page_size),
+            ),
+        ),
+        ui.Text(
+            f"Page {page + 1} of {total_pages}  ·  {total_rows} row(s) total",
+            variant="caption",
+        ),
+        ui.Button(
+            "Next", icon="ChevronRight",
+            variant="ghost" if has_next else "primary",
+            size="sm",
+            disabled=not has_next,
+            on_click=ui.Call(
+                "__panel__editor",
+                note_id=conn_id, tab="results", action=action,
+                sql=base_sql,
+                page=str(page + 1), page_size=str(page_size),
+            ),
+        ),
+    ], direction="horizontal", gap=2))
+
+
 async def run_and_show(
     children: list, uid: str, conn_id: str, conn_data: dict, sql: str, action: str,
+    page: int = 0, page_size: int = 50, paginate: bool = False,
 ) -> None:
-    """Execute SQL with given action (run/explain/dry_run) and render result."""
+    """Execute SQL with given action (run/explain/dry_run) and render result.
+
+    When `paginate=True` and the statement is a simple single-table SELECT,
+    the SQL's trailing LIMIT/OFFSET is stripped, replaced with page-based
+    LIMIT/OFFSET, and Previous/Next controls are rendered.
+    """
     sql_clean = sql.strip().rstrip(";")
     if not sql_clean:
         children.append(ui.Alert(title="Empty", message="Empty SQL", type="warning"))
@@ -134,10 +221,26 @@ async def run_and_show(
         ))
         return
 
+    # ── Browse detection + pagination prep ────────────────────────────
+    table = _detect_single_table(sql_clean) if is_read else ""
+    pk_col = ""
+    base_sql = sql_clean
+    total_rows = -1
+    paging_on = False
+
+    if paginate and table:
+        base_sql = _strip_trailing_limit(sql_clean)
+        sql_to_run = f"{base_sql} LIMIT {page_size} OFFSET {page * page_size}"
+        total_rows = await _fetch_total_rows(uid, conn_id, conn_data, table)
+        paging_on = True
+    else:
+        sql_to_run = sql_clean
+
     # ── RUN mode ──────────────────────────────────────────────────────
     async def _call_query():
         return await _api_post(f"/v1/connections/{conn_id}/query", {
-            "user_id": uid, "sql": sql_clean, "limit": 200,
+            "user_id": uid, "sql": sql_to_run,
+            "limit": page_size if paging_on else 200,
             "connection": conn_info,
         })
 
@@ -191,24 +294,24 @@ async def run_and_show(
     exec_ms = result.get("exec_ms", 0)
 
     if is_read:
-        total = result.get("total_rows", 0)
+        page_rows = result.get("total_rows", 0)
         columns = result.get("columns", [])
         raw_rows = result.get("rows", [])
 
+        if paging_on and total_rows >= 0:
+            start = page * page_size + 1 if page_rows > 0 else 0
+            end = page * page_size + page_rows
+            alert_title = f"Showing rows {start}-{end} of {total_rows}"
+        else:
+            alert_title = f"{page_rows} row(s)"
         children.append(ui.Alert(
-            title=f"{total} row(s)",
+            title=alert_title,
             message=f"Executed in {exec_ms}ms",
-            type="success" if total > 0 else "info",
+            type="success" if page_rows > 0 else "info",
         ))
 
-        # Single-table browse detection → row_form interactivity
-        table = _detect_single_table(sql_clean)
-        pk_col = ""
         if table:
             pk_col = await _fetch_pk_column(uid, conn_id, conn_data, table)
-
-        if table:
-            # Insert button is always shown for single-table SELECT, even if no PK
             children.append(ui.Stack([
                 ui.Button(
                     f"Insert new row into {table}",
@@ -225,8 +328,6 @@ async def run_and_show(
             cols = [ui.DataColumn(key=c, label=c) for c in columns]
             rows = []
             for i, row in enumerate(raw_rows):
-                # If PK detected, use it as the stable row id so on_row_click
-                # can route to row_form edit. Otherwise synthetic index.
                 if pk_col and pk_col in row and row[pk_col] is not None:
                     row_id = str(row[pk_col])
                 else:
@@ -238,8 +339,6 @@ async def run_and_show(
 
             on_row_click = None
             if table and pk_col:
-                # DataTable injects the clicked row dict as `row` kwarg on the
-                # target handler — pk_value is pulled from row[pk_col] there.
                 on_row_click = ui.Call(
                     "__panel__editor",
                     note_id=conn_id, tab="row_form",
@@ -250,8 +349,15 @@ async def run_and_show(
                 columns=cols, rows=rows,
                 on_row_click=on_row_click,
             ) if on_row_click else ui.DataTable(columns=cols, rows=rows))
-        elif total == 0:
+        elif page_rows == 0:
             children.append(ui.Empty(message="No rows returned", icon="TableProperties"))
+
+        # Paginator after DataTable
+        if paging_on:
+            _render_paginator(
+                children, conn_id, base_sql, action,
+                page, page_size, total_rows,
+            )
 
     else:
         affected = result.get("rows_affected", 0)

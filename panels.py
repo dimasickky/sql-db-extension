@@ -145,9 +145,11 @@ def _build_table_items(conn_id: str, tables: list[dict]) -> list:
         row_count = t.get("rows", "?")
         columns = t.get("columns", [])
 
-        # Backtick-escape table name for MariaDB identifiers
+        # Backtick-escape table name for MariaDB identifiers.
+        # No LIMIT here — the editor's pagination appends LIMIT/OFFSET
+        # per page and strips any trailing LIMIT we'd add anyway.
         quoted = f"`{name}`"
-        select_sql = f"SELECT * FROM {quoted} LIMIT 200"
+        select_sql = f"SELECT * FROM {quoted}"
 
         pk_col = next(
             (c.get("COLUMN_NAME", "") for c in columns if c.get("COLUMN_KEY") == "PRI"),

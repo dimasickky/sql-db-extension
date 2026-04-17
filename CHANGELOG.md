@@ -6,6 +6,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.2.0] — 2026-04-17
+
+Real pagination on browse — use case: tables with thousands of rows.
+
+### Added
+
+- `page` and `page_size` params on `__panel__editor` (default `0` and `50`).
+- When the executed SQL is a simple single-table SELECT and `paginate=True`:
+  - Strip any trailing `LIMIT … OFFSET …` from the SQL
+  - Append `LIMIT page_size OFFSET page*page_size` server-side
+  - Run a separate `SELECT COUNT(*)` to know the total
+  - Render an Alert "Showing rows X-Y of N"
+  - Render Previous / Next buttons + "Page N of M · N row(s) total" caption
+- Page size capped 5..500. Multi-statement runs skip pagination (each statement gets default 200).
+
+### Changed
+
+- Sidebar table click no longer hard-codes `LIMIT 200`. Sends a bare `SELECT * FROM \`table\`` and lets the paginator handle slicing per page.
+- `run_and_show()` signature gains `page`, `page_size`, `paginate` kwargs.
+
+### Notes
+
+- Pagination is OFFSET-based (server-side) using the existing `/v1/connections/{id}/query` endpoint. Keyset cursor would scale better for >100k rows but adds backend complexity — deferred.
+- COUNT(*) cost is one extra query per render. For huge tables, consider INFORMATION_SCHEMA `TABLE_ROWS` (approximate, free) — future optimisation.
+
+---
+
 ## [1.1.0] — 2026-04-16
 
 Row-level CRUD in the panel UI. No more raw-SQL-only for simple edits.

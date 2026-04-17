@@ -29,6 +29,7 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
                      sql: str = "", action: str = "run",
                      table: str = "", mode: str = "insert",
                      pk_col: str = "", pk_value: str = "",
+                     page: str = "0", page_size: str = "50",
                      **kwargs):
     """SQL editor — self-contained. Executes queries and shows results in-panel."""
     uid = _user_id(ctx)
@@ -141,10 +142,25 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
                     message=f"Action: {action} · executing sequentially…",
                     type="info",
                 ))
+            # Pagination only applies to single-statement browses
+            try:
+                page_i = max(int(page), 0)
+            except (TypeError, ValueError):
+                page_i = 0
+            try:
+                page_size_i = max(min(int(page_size), 500), 5)
+            except (TypeError, ValueError):
+                page_size_i = 50
+            multi = len(statements) > 1
             for i, stmt in enumerate(statements, 1):
-                if len(statements) > 1:
+                if multi:
                     children.append(ui.Divider(f"[{i}/{len(statements)}] {stmt[:60]}…"))
-                await run_and_show(children, uid, conn_id, conn_data, stmt, action)
+                await run_and_show(
+                    children, uid, conn_id, conn_data, stmt, action,
+                    page=(0 if multi else page_i),
+                    page_size=(200 if multi else page_size_i),
+                    paginate=(not multi),
+                )
 
             children.append(ui.Divider())
             children.append(ui.Stack([
