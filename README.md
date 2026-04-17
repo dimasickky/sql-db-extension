@@ -172,7 +172,7 @@ The extension reads these env vars on the Imperal Platform Worker:
 
 | Variable | Purpose |
 |----------|---------|
-| `DB_SERVICE_URL` | URL of the `the backend` backend (default `http://REDACTED_HOST:8099`) |
+| `DB_SERVICE_URL` | URL of the `the backend` backend (e.g. `https://the backend.internal.example.com`) — required |
 | `DB_SERVICE_KEY` | API key for `the backend` |
 | `SQL_DB_ENCRYPTION_KEY` | Fernet key — MUST match the backend key (shared secret) |
 
