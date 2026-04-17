@@ -35,6 +35,7 @@ class PulseParams(BaseModel):
     ),
 )
 async def fn_pulse_sql_executed(ctx, params: PulseParams) -> ActionResult:
+    """Internal side-channel: emit sql.executed after panel-direct DML so the sidebar refreshes."""
     return ActionResult.success(data={"kind": params.kind}, summary="")
 
 
@@ -92,6 +93,7 @@ async def _resolve(ctx, connection_id: str = ""):
     description="Insert a new row into a table. Values as JSON object of column -> value.",
 )
 async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
+    """Insert a new row into a table. Values as JSON object of column -> value."""
     try:
         values, err = _parse_values(params.values_json)
         if err:
@@ -131,6 +133,7 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
     description="Update a single row identified by primary key. Changes as JSON object of column -> new value.",
 )
 async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
+    """Update a single row identified by primary key. Changes as JSON object of column -> new value."""
     try:
         values, err = _parse_values(params.values_json)
         if err:
@@ -171,6 +174,7 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
     description="Delete a single row identified by primary key. Requires confirmation.",
 )
 async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
+    """Delete a single row identified by primary key. Requires confirmation."""
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:

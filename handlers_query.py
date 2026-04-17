@@ -53,6 +53,7 @@ async def _resolve(ctx, connection_id: str = "") -> tuple[dict | None, str]:
     description="Run a SELECT query on the database.",
 )
 async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
+    """Run a SELECT query on the database."""
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
@@ -86,6 +87,7 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
     description="Get database schema — tables, columns, indexes.",
 )
 async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
+    """Get database schema — tables, columns, indexes."""
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
@@ -115,6 +117,7 @@ async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
     description="Run EXPLAIN on a query to see execution plan.",
 )
 async def fn_explain_query(ctx, params: ExplainParams) -> ActionResult:
+    """Run EXPLAIN on a query to see execution plan."""
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
@@ -139,6 +142,7 @@ async def fn_explain_query(ctx, params: ExplainParams) -> ActionResult:
     description="Dry-run a DML statement: execute in transaction, count affected rows, then ROLLBACK.",
 )
 async def fn_dry_run(ctx, params: DryRunParams) -> ActionResult:
+    """Dry-run a DML statement: execute in transaction, count affected rows, then ROLLBACK."""
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:

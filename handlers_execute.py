@@ -27,6 +27,7 @@ class RunEditorSqlParams(BaseModel):
     description="Execute a DML/DDL statement (INSERT, UPDATE, DELETE, ALTER, CREATE, DROP). Requires confirmation.",
 )
 async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
+    """Execute a DML/DDL statement (INSERT, UPDATE, DELETE, ALTER, CREATE, DROP). Requires confirmation."""
     try:
         from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
@@ -57,7 +58,7 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
 
 
 @chat.function(
-    "run_editor_sql", action_type="write",
+    "run_editor_sql", action_type="write", event="sql.executed",
     description="Run any SQL from the editor. Auto-detects: SELECT goes to query, DML/DDL goes to execute.",
 )
 async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:

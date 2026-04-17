@@ -46,6 +46,7 @@ class DeleteSavedParams(BaseModel):
     description="List recent query history for the active connection.",
 )
 async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
+    """List recent query history for the active connection."""
     try:
         from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
@@ -70,6 +71,7 @@ async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
     description="Save a query for later use.",
 )
 async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
+    """Save a query for later use."""
     try:
         from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
@@ -97,6 +99,7 @@ async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
     description="List saved queries for the active connection.",
 )
 async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
+    """List saved queries for the active connection."""
     try:
         from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
@@ -122,6 +125,7 @@ async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
     description="Run a previously saved query.",
 )
 async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
+    """Run a previously saved query."""
     try:
         from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
@@ -169,6 +173,7 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
     description="Delete a saved query.",
 )
 async def fn_delete_saved(ctx, params: DeleteSavedParams) -> ActionResult:
+    """Delete a saved query."""
     try:
         from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
