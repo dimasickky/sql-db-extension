@@ -4,6 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _api_post, _user_id, get_active_connection, build_conn_info
+from handlers_query import _resolve
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -23,7 +24,6 @@ class NlToSqlParams(BaseModel):
 async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
     """Convert a natural language question to SQL using the database schema."""
     try:
-        from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
             return ActionResult.error("No active connection.")

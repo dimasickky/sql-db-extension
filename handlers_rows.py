@@ -11,6 +11,7 @@ import json as _json
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _api_post, _user_id, build_conn_info
+from handlers_query import _resolve as _query_resolve
 
 
 # ─── Event pulse (internal) ───────────────────────────────────────────── #
@@ -81,9 +82,8 @@ def _parse_values(values_json: str) -> tuple[dict, str | None]:
 
 
 async def _resolve(ctx, connection_id: str = ""):
-    """Shared connection resolver (avoids circular import with handlers_query)."""
-    from handlers_query import _resolve as _r
-    return await _r(ctx, connection_id)
+    """Thin wrapper — binding captured at import to survive sys.modules swaps."""
+    return await _query_resolve(ctx, connection_id)
 
 
 # ─── Handlers ─────────────────────────────────────────────────────────── #
