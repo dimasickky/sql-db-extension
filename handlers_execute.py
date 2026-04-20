@@ -4,6 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _api_post, _user_id, build_conn_info
+from handlers_query import _resolve, RunQueryParams, ExplainParams  # noqa: F401
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -29,7 +30,6 @@ class RunEditorSqlParams(BaseModel):
 async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
     """Execute a DML/DDL statement (INSERT, UPDATE, DELETE, ALTER, CREATE, DROP). Requires confirmation."""
     try:
-        from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
             return ActionResult.error("No active connection.")
@@ -70,7 +70,6 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
     first_word = sql.split()[0].upper()
     is_read = first_word in ("SELECT", "SHOW", "DESCRIBE", "DESC", "EXPLAIN")
 
-    from handlers_query import _resolve, RunQueryParams, ExplainParams
     conn, conn_id = await _resolve(ctx, params.connection_id)
     if not conn:
         return ActionResult.error("No active connection.")

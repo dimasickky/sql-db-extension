@@ -4,6 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _api_get, _api_post, _api_delete, _api_patch, _user_id, build_conn_info
+from handlers_query import _resolve
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -48,7 +49,6 @@ class DeleteSavedParams(BaseModel):
 async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
     """List recent query history for the active connection."""
     try:
-        from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
             return ActionResult.error("No active connection.")
@@ -73,7 +73,6 @@ async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
 async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
     """Save a query for later use."""
     try:
-        from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
             return ActionResult.error("No active connection.")
@@ -101,7 +100,6 @@ async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
 async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
     """List saved queries for the active connection."""
     try:
-        from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
             return ActionResult.error("No active connection.")
@@ -127,7 +125,6 @@ async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
 async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
     """Run a previously saved query."""
     try:
-        from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
             return ActionResult.error("No active connection.")
@@ -175,7 +172,6 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
 async def fn_delete_saved(ctx, params: DeleteSavedParams) -> ActionResult:
     """Delete a saved query."""
     try:
-        from handlers_query import _resolve
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
             return ActionResult.error("No active connection.")
