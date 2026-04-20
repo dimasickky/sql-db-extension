@@ -5,7 +5,7 @@
   "tools": [
     {
       "name": "tool_sql_db_chat",
-      "description": "SQL Database assistant — connect to MySQL/MariaDB databases, browse schema, run queries, explain execution plans, manage saved queries",
+      "description": "SQL Database assistant — connect to MySQL/MariaDB databases, browse schema and tables, run SELECT queries, execute DML/DDL (INSERT, UPDATE, DELETE, ALTER, CREATE, DROP), insert/update/delete single rows, natural-language to SQL (nl_to_sql), explain execution plans, dry-run writes, manage saved queries, view SQL query execution history, switch between connections. NOT for email or chat message history, application audit logs, file contents, notes, or NoSQL stores.",
       "scopes": ["*"],
       "parameters": {
         "message": {"type": "string", "required": false},
