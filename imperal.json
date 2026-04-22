@@ -21,8 +21,8 @@
       }
     },
     {
-      "name": "skeleton_alert_db",
-      "description": "Alert on schema changes.",
+      "name": "skeleton_alert_db_schema",
+      "description": "Alert on schema changes (tables added or removed).",
       "scopes": ["sql-db.read"],
       "parameters": {
         "old": {"type": "string", "required": false},

@@ -10,21 +10,39 @@ log = logging.getLogger("sql-db")
 
 # ─── Skeleton ─────────────────────────────────────────────────────────── #
 
-@ext.tool(
-    "skeleton_refresh_db_schema",
-    scopes=["sql-db.read"],
-    description="Background refresh: database schema cache for active connection.",
+@ext.skeleton(
+    "db_schema",
+    alert=True,
+    ttl=300,
+    description="Active database schema cache — tables, columns, row counts.",
 )
 async def skeleton_refresh_db_schema(ctx, **kwargs) -> dict:
-    """Refresh schema for the user's active connection. Stored in skeleton."""
+    """Refresh schema for the user's active connection. Idempotent — safe per tick.
+
+    Scalar fields (database, connection, table_count) surface in the
+    classifier envelope so the intent router can tell sql-db intent from
+    unrelated traffic without a per-extension prompt rule.
+    """
     try:
         conn, conn_id = await resolve_connection(ctx)
         if not conn:
-            return {"response": {"tables": [], "note": "No active connection"}}
+            return {"response": {
+                "database": "",
+                "connection": "",
+                "table_count": 0,
+                "tables": [],
+                "note": "No active connection",
+            }}
 
         database = conn.get("database", "")
         if not database:
-            return {"response": {"tables": [], "note": "No database selected"}}
+            return {"response": {
+                "database": "",
+                "connection": conn.get("name", ""),
+                "table_count": 0,
+                "tables": [],
+                "note": "No database selected",
+            }}
 
         result = await _api_post(f"/v1/connections/{conn_id}/schema", {
             "user_id": _user_id(ctx),
@@ -48,23 +66,36 @@ async def skeleton_refresh_db_schema(ctx, **kwargs) -> dict:
             })
 
         return {"response": {
-            "database": database,
-            "connection": conn.get("name", ""),
-            "tables": compact_tables,
+            "database":    database,
+            "connection":  conn.get("name", ""),
             "table_count": len(compact_tables),
+            "tables":      compact_tables,
         }}
     except Exception as e:
         log.error("Skeleton refresh failed: %s", e)
-        return {"response": {"tables": [], "error": str(e)}}
+        return {"response": {
+            "database": "",
+            "connection": "",
+            "table_count": 0,
+            "tables": [],
+            "error": str(e),
+        }}
 
 
 @ext.tool(
-    "skeleton_alert_db",
+    "skeleton_alert_db_schema",
     scopes=["sql-db.read"],
-    description="Alert on schema changes.",
+    description="Alert on schema changes (tables added or removed).",
 )
-async def skeleton_alert_db(ctx, old: dict = None, new: dict = None, **kwargs) -> dict:
-    """Compare old and new schema, alert on table additions/removals."""
+async def skeleton_alert_db_schema(
+    ctx, old: dict = None, new: dict = None, **kwargs,
+) -> dict:
+    """Compare old and new schema, alert on table additions/removals.
+
+    Kernel invokes this tool only when alert=True on the refresh decorator
+    AND the `db_schema` section's `_checksum` changed between ticks. It is
+    NOT called on every tick.
+    """
     if not old or not new:
         return {"response": ""}
 
