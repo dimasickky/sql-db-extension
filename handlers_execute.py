@@ -23,20 +23,60 @@ class RunEditorSqlParams(BaseModel):
 
 # ─── Handler ──────────────────────────────────────────────────────────── #
 
+_WRITE_VERBS_AFFECTING_ROWS = {"INSERT", "UPDATE", "DELETE", "REPLACE"}
+
+
+def _direct_params(ctx) -> dict:
+    """Pull params placed by the kernel's _call_function_direct path.
+
+    Automation `tool_call` steps bypass LLM tool_use parsing and stash
+    the resolved args under ctx._data["_direct_params"]. If the SDK
+    didn't map them into our Pydantic model, read from here as fallback.
+    """
+    data = getattr(ctx, "_data", None) or {}
+    direct = data.get("_direct_params") if isinstance(data, dict) else None
+    return direct if isinstance(direct, dict) else {}
+
+
 @chat.function(
     "execute_sql", action_type="destructive", event="sql.executed",
-    description="Execute a DML/DDL statement (INSERT, UPDATE, DELETE, ALTER, CREATE, DROP). Requires confirmation.",
+    description=(
+        "Execute a write statement (INSERT, UPDATE, DELETE, REPLACE, ALTER, "
+        "CREATE, DROP, TRUNCATE). Use this for all database mutations "
+        "including automation-triggered inserts."
+    ),
 )
 async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
-    """Execute a DML/DDL statement (INSERT, UPDATE, DELETE, ALTER, CREATE, DROP). Requires confirmation."""
+    """Execute a DML/DDL statement."""
     try:
-        conn, conn_id = await _resolve(ctx, params.connection_id)
+        sql = (params.sql or "").strip().rstrip(";")
+        conn_id_in = params.connection_id or ""
+
+        # Automation-path fallback: SDK may not map ctx._data["_direct_params"]
+        # into the Pydantic model. Pull what's missing.
+        if not sql or not conn_id_in or sql.lower() == "sql" or conn_id_in == "connection_id":
+            direct = _direct_params(ctx)
+            if (not sql or sql.lower() == "sql") and direct.get("sql"):
+                sql = str(direct["sql"]).strip().rstrip(";")
+            if (not conn_id_in or conn_id_in == "connection_id") and direct.get("connection_id"):
+                conn_id_in = str(direct["connection_id"])
+
+        if not sql or sql.lower() == "sql":
+            return ActionResult.error(
+                "execute_sql: sql parameter is empty or unresolved placeholder"
+            )
+        if conn_id_in == "connection_id":
+            conn_id_in = ""
+
+        conn, conn_id = await _resolve(ctx, conn_id_in)
         if not conn:
-            return ActionResult.error("No active connection.")
+            return ActionResult.error(
+                f"No connection resolved (connection_id='{params.connection_id}')."
+            )
 
         result = await _api_post(f"/v1/connections/{conn_id}/execute", {
             "user_id": _user_id(ctx),
-            "sql": params.sql,
+            "sql": sql,
             "confirmed": True,
             "connection": build_conn_info(conn),
         })
@@ -44,14 +84,27 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
         if result.get("status") != "ok":
             return ActionResult.error(result.get("detail", "Execution failed"))
 
+        rows_affected = int(result.get("rows_affected", 0) or 0)
+        query_type = (result.get("query_type") or "").upper()
+
+        # Loud fail for automation-path zero-row writes: the kernel normalizes
+        # ActionResult.success into status=ok and reports steps=1 failed=0 even
+        # when INSERT/UPDATE/DELETE affected no rows. Surface that as error so
+        # rules don't report phantom success.
+        if rows_affected == 0 and query_type in _WRITE_VERBS_AFFECTING_ROWS:
+            return ActionResult.error(
+                f"{query_type} executed but 0 rows affected — "
+                f"check VALUES list or WHERE clause"
+            )
+
         return ActionResult.success(
             data={
-                "rows_affected": result.get("rows_affected", 0),
+                "rows_affected": rows_affected,
                 "query_type": result.get("query_type", ""),
                 "tables": result.get("tables", []),
                 "exec_ms": result.get("exec_ms", 0),
             },
-            summary=f"{result.get('query_type', 'SQL')} — {result.get('rows_affected', 0)} row(s) affected",
+            summary=f"{result.get('query_type', 'SQL')} — {rows_affected} row(s) affected",
         )
     except Exception as e:
         return ActionResult.error(str(e))
