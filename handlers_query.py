@@ -48,20 +48,42 @@ async def _resolve(ctx, connection_id: str = "") -> tuple[dict | None, str]:
 
 # ─── Handlers ─────────────────────────────────────────────────────────── #
 
+_SELECT_VERBS = {"SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "EXPLAIN"}
+
+
 @chat.function(
     "run_query", action_type="read",
-    description="Run a SELECT query on the database.",
+    description=(
+        "Run a read-only query (SELECT/WITH/SHOW/DESCRIBE/EXPLAIN). "
+        "Use execute_sql for INSERT/UPDATE/DELETE/DDL."
+    ),
 )
 async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
     """Run a SELECT query on the database."""
     try:
-        conn, conn_id = await _resolve(ctx, params.connection_id)
+        sql = (params.sql or "").strip().rstrip(";")
+        if not sql or sql.lower() == "sql":
+            return ActionResult.error(
+                "run_query: sql parameter is empty or unresolved placeholder"
+            )
+
+        first = sql.split(None, 1)[0].upper() if sql else ""
+        if first not in _SELECT_VERBS:
+            return ActionResult.error(
+                f"run_query accepts read-only verbs only (got '{first}'). "
+                f"Use execute_sql for {first} and other DML/DDL statements."
+            )
+
+        conn_id_in = params.connection_id or ""
+        if conn_id_in == "connection_id":
+            conn_id_in = ""
+        conn, conn_id = await _resolve(ctx, conn_id_in)
         if not conn:
             return ActionResult.error("No active connection. Use add_connection first.")
 
         result = await _api_post(f"/v1/connections/{conn_id}/query", {
             "user_id": _user_id(ctx),
-            "sql": params.sql,
+            "sql": sql,
             "limit": params.limit,
             "connection": build_conn_info(conn),
         })
