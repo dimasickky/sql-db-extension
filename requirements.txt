@@ -1,1 +1,1 @@
-imperal-sdk @ git+https://github.com/imperalcloud/imperal-sdk.git@v1.5.22
+imperal-sdk @ git+https://github.com/imperalcloud/imperal-sdk.git@v1.5.24
