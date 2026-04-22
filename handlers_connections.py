@@ -43,6 +43,13 @@ class SelectConnectionParams(BaseModel):
     connection_id: str = Field(description="Connection ID to activate")
 
 
+class ResolveConnByDbParams(BaseModel):
+    """Resolve a connection by database or connection name."""
+    database_name: str = Field(
+        description="Database name (e.g. 'ijodghbk_test') or connection name"
+    )
+
+
 # ─── Handlers ─────────────────────────────────────────────────────────── #
 
 @chat.function(
@@ -125,6 +132,68 @@ async def fn_list_connections(ctx) -> ActionResult:
         return ActionResult.success(
             data={"connections": connections, "total": len(connections)},
             summary=f"Found {len(connections)} connection(s)",
+        )
+    except Exception as e:
+        return ActionResult.error(str(e))
+
+
+@chat.function(
+    "resolve_connection_by_database", action_type="read",
+    description=(
+        "Resolve connection_id for a database or connection name. "
+        "Use as the first step in automations before run_query/execute_sql, "
+        "e.g. resolve_connection_by_database(database_name='ijodghbk_test') "
+        "-> pass the returned connection_id into the next step."
+    ),
+)
+async def fn_resolve_connection_by_database(
+    ctx, params: ResolveConnByDbParams,
+) -> ActionResult:
+    """Return {connection_id} for a saved connection matching database_name or name."""
+    uid = _user_id(ctx)
+    target = (params.database_name or "").strip()
+    if not target or target in ("database_name", "connection_id"):
+        return ActionResult.error(
+            "resolve_connection_by_database: database_name is empty or an unresolved placeholder"
+        )
+    try:
+        page = await ctx.store.query(CONN_COLLECTION, where={"user_id": uid}, limit=100)
+        # Prefer exact database match, then connection name, then case-insensitive.
+        target_lc = target.lower()
+        exact = next(
+            (d for d in page.data if (d.data.get("database") or "") == target),
+            None,
+        )
+        if not exact:
+            exact = next(
+                (d for d in page.data if (d.data.get("name") or "") == target),
+                None,
+            )
+        if not exact:
+            exact = next(
+                (d for d in page.data
+                 if (d.data.get("database") or "").lower() == target_lc
+                 or (d.data.get("name") or "").lower() == target_lc),
+                None,
+            )
+        if not exact:
+            available = sorted({
+                (d.data.get("database") or d.data.get("name") or "")
+                for d in page.data
+                if d.data.get("database") or d.data.get("name")
+            })
+            return ActionResult.error(
+                f"No connection found for '{target}'. "
+                f"Available: {available or '(none)'}"
+            )
+        return ActionResult.success(
+            data={
+                "connection_id": exact.id,
+                "database": exact.data.get("database", ""),
+                "name": exact.data.get("name", ""),
+                "host": exact.data.get("host", ""),
+            },
+            summary=f"connection_id={exact.id} for {target}",
         )
     except Exception as e:
         return ActionResult.error(str(e))
