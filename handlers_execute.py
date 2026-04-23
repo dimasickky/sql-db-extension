@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _api_post, _user_id, build_conn_info
 from handlers_query import _resolve, RunQueryParams, ExplainParams  # noqa: F401
+from schema_guard import list_known_tables
+from sql_parser import extract_target_tables
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -26,18 +28,6 @@ class RunEditorSqlParams(BaseModel):
 _WRITE_VERBS_AFFECTING_ROWS = {"INSERT", "UPDATE", "DELETE", "REPLACE"}
 
 
-def _direct_params(ctx) -> dict:
-    """Pull params placed by the kernel's _call_function_direct path.
-
-    Automation `tool_call` steps bypass LLM tool_use parsing and stash
-    the resolved args under ctx._data["_direct_params"]. If the SDK
-    didn't map them into our Pydantic model, read from here as fallback.
-    """
-    data = getattr(ctx, "_data", None) or {}
-    direct = data.get("_direct_params") if isinstance(data, dict) else None
-    return direct if isinstance(direct, dict) else {}
-
-
 @chat.function(
     "execute_sql", action_type="destructive", event="sql.executed",
     description=(
@@ -47,26 +37,34 @@ def _direct_params(ctx) -> dict:
     ),
 )
 async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
-    """Execute a DML/DDL statement."""
+    """Execute a DML/DDL statement.
+
+    Automation `tool_call` steps flow through kernel's `_call_function_direct`
+    (session 42 fix, I-AUTO-TOOL-CALL) and arrive bound to the Pydantic model
+    like any chat tool use — no `_direct_params` fallback needed.
+    """
     try:
         sql = (params.sql or "").strip().rstrip(";")
         conn_id_in = params.connection_id or ""
 
-        # Automation-path fallback: SDK may not map ctx._data["_direct_params"]
-        # into the Pydantic model. Pull what's missing.
-        if not sql or not conn_id_in or sql.lower() == "sql" or conn_id_in == "connection_id":
-            direct = _direct_params(ctx)
-            if (not sql or sql.lower() == "sql") and direct.get("sql"):
-                sql = str(direct["sql"]).strip().rstrip(";")
-            if (not conn_id_in or conn_id_in == "connection_id") and direct.get("connection_id"):
-                conn_id_in = str(direct["connection_id"])
-
-        if not sql or sql.lower() == "sql":
+        if not sql:
             return ActionResult.error(
-                "execute_sql: sql parameter is empty or unresolved placeholder"
+                "execute_sql: sql parameter is empty"
             )
-        if conn_id_in == "connection_id":
-            conn_id_in = ""
+
+        # Light schema gate: if skeleton knows a concrete list of tables and
+        # we can extract a single target table that isn't in the list, fail
+        # fast. Subqueries / CTEs / DDL ambiguity → extractor returns [] →
+        # we skip the gate (don't over-reject).
+        known = list_known_tables(ctx)
+        if known:
+            targets = extract_target_tables(sql)
+            missing = [t for t in targets if t not in known]
+            if missing:
+                return ActionResult.error(
+                    f"Unknown table(s) referenced: {', '.join(missing)}. "
+                    f"Known tables: {', '.join(known)}."
+                )
 
         conn, conn_id = await _resolve(ctx, conn_id_in)
         if not conn:
