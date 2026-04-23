@@ -4,8 +4,6 @@ from __future__ import annotations
 import logging
 import os
 
-import httpx
-
 from imperal_sdk import Extension
 from imperal_sdk.chat import ChatExtension, ActionResult
 
@@ -40,20 +38,54 @@ def encrypt_password(plaintext: str) -> str:
     return _get_fernet().encrypt(plaintext.encode()).decode()
 
 
-# ─── HTTP ─────────────────────────────────────────────────────────────── #
+# ─── HTTP via SDK HTTPClient (replaces direct httpx.AsyncClient) ──────── #
+#
+# We use imperal_sdk.http.HTTPClient directly (not ctx.http) because our
+# _api_* helpers are module-level and called from panel render paths and
+# handlers alike — threading ctx through every layer would be invasive.
+# HTTPClient is the same wrapper ctx.http uses under the hood: typed
+# HTTPResponse (.status_code / .body / .ok / .json()) and no hidden state
+# that could bleed across tenants (per-request httpx.AsyncClient per call).
 
-_http = None
+from imperal_sdk.http import HTTPClient
+
+_http_client: HTTPClient | None = None
 
 
-def _get_http() -> httpx.AsyncClient:
-    global _http
-    if _http is None:
-        _http = httpx.AsyncClient(
-            base_url=DB_SERVICE_URL,
-            headers={"x-api-key": DB_SERVICE_KEY},
-            timeout=30.0,
-        )
-    return _http
+def _http() -> HTTPClient:
+    global _http_client
+    if _http_client is None:
+        _http_client = HTTPClient(timeout=30)
+    return _http_client
+
+
+def _db_url(path: str) -> str:
+    return f"{DB_SERVICE_URL.rstrip('/')}{path}"
+
+
+def _auth_headers() -> dict:
+    return {"x-api-key": DB_SERVICE_KEY} if DB_SERVICE_KEY else {}
+
+
+def _extract_error(resp) -> dict:
+    """Extract error detail from a failed HTTPResponse (SDK shape)."""
+    body = resp.body
+    if isinstance(body, dict):
+        detail = body.get("detail") or str(body)
+    elif isinstance(body, (bytes, str)):
+        detail = body.decode() if isinstance(body, bytes) else body
+        detail = detail or f"HTTP {resp.status_code}"
+    else:
+        detail = f"HTTP {resp.status_code}"
+    return {"status": "error", "detail": detail}
+
+
+def _safe_json(resp) -> dict:
+    """Return resp.json() or a synthetic error dict if body isn't JSON."""
+    try:
+        return resp.json()
+    except Exception:
+        return {"status": "error", "detail": str(resp.body)[:500]}
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────── #
@@ -68,42 +100,34 @@ def _tenant_id(ctx) -> str:
     return "default"
 
 
-def _extract_error(r: httpx.Response) -> dict:
-    """Extract error detail from a failed HTTP response."""
-    try:
-        body = r.json()
-        detail = body.get("detail", r.text)
-    except Exception:
-        detail = r.text or f"HTTP {r.status_code}"
-    return {"status": "error", "detail": detail}
-
-
 async def _api_post(path: str, data: dict) -> dict:
-    r = await _get_http().post(path, json=data)
-    if r.status_code >= 400:
+    r = await _http().post(_db_url(path), json=data, headers=_auth_headers())
+    if not r.ok:
         return _extract_error(r)
-    return r.json()
+    return _safe_json(r)
 
 
 async def _api_get(path: str, params: dict = None) -> dict:
-    r = await _get_http().get(path, params=params or {})
-    if r.status_code >= 400:
+    r = await _http().get(_db_url(path), params=params or {}, headers=_auth_headers())
+    if not r.ok:
         return _extract_error(r)
-    return r.json()
+    return _safe_json(r)
 
 
 async def _api_delete(path: str, params: dict = None) -> dict:
-    r = await _get_http().delete(path, params=params or {})
-    if r.status_code >= 400:
+    r = await _http().delete(_db_url(path), params=params or {}, headers=_auth_headers())
+    if not r.ok:
         return _extract_error(r)
-    return r.json()
+    return _safe_json(r)
 
 
 async def _api_patch(path: str, params: dict, data: dict) -> dict:
-    r = await _get_http().patch(path, params=params, json=data)
-    if r.status_code >= 400:
+    r = await _http().patch(
+        _db_url(path), params=params, json=data, headers=_auth_headers(),
+    )
+    if not r.ok:
         return _extract_error(r)
-    return r.json()
+    return _safe_json(r)
 
 
 # ─── Connection helpers ───────────────────────────────────────────────── #
@@ -192,8 +216,10 @@ chat = ChatExtension(
 @ext.health_check
 async def health(ctx) -> dict:
     try:
-        r = await _get_http().get("/health")
-        data = r.json()
+        r = await _http().get(_db_url("/health"), headers=_auth_headers())
+        if not r.ok:
+            return {"status": "degraded", "version": ext.version, "backend": "unreachable"}
+        data = r.json() if isinstance(r.body, (dict, str)) else {}
         return {"status": "ok", "version": ext.version, "backend": data.get("status")}
     except Exception:
         return {"status": "degraded", "version": ext.version, "backend": "unreachable"}
