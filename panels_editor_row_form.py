@@ -2,92 +2,20 @@
 
 Rendered as a tab inside the existing editor panel. Fetches schema for the
 given table, detects primary key, and builds a type-aware Form.
+
+This file is the orchestrator. Input rendering lives in
+`_row_form_inputs.py`; submit handling lives in `_row_form_submit.py`.
 """
 from __future__ import annotations
 
-import json as _json
 import logging
 
 from imperal_sdk import ui
 
-from app import _api_post, _user_id, build_conn_info
+from app import _api_post, build_conn_info
+from _row_form_inputs import render_input, append_back_button
 
 log = logging.getLogger("sql-db")
-
-
-# ─── Column → Input mapper ────────────────────────────────────────────── #
-
-_BOOLEAN_TYPES = ("tinyint(1)", "bit(1)", "boolean", "bool")
-_NUMERIC_PREFIXES = ("int", "bigint", "smallint", "mediumint", "tinyint",
-                     "decimal", "numeric", "float", "double", "real")
-_LONG_TEXT_TYPES = ("text", "mediumtext", "longtext", "json", "blob",
-                    "mediumblob", "longblob")
-
-
-def _is_boolean(col_type: str) -> bool:
-    t = col_type.lower().strip()
-    return any(t == b or t.startswith(b) for b in _BOOLEAN_TYPES)
-
-
-def _is_numeric(col_type: str) -> bool:
-    t = col_type.lower().strip()
-    return any(t.startswith(p) for p in _NUMERIC_PREFIXES)
-
-
-def _is_long_text(col_type: str) -> bool:
-    t = col_type.lower().strip()
-    return any(t.startswith(p) for p in _LONG_TEXT_TYPES)
-
-
-def _render_input(col: dict, default_value: str) -> list:
-    """Return (label, input) components for one column."""
-    name = col.get("COLUMN_NAME", "")
-    ctype = col.get("COLUMN_TYPE", "")
-    nullable = col.get("IS_NULLABLE", "YES") == "YES"
-    key = col.get("COLUMN_KEY", "")
-    extra = col.get("EXTRA", "")
-    is_auto = "auto_increment" in extra.lower()
-
-    hint_parts = [ctype]
-    if key == "PRI":
-        hint_parts.append("PK")
-    if is_auto:
-        hint_parts.append("auto")
-    if not nullable:
-        hint_parts.append("NOT NULL")
-    hint = " · ".join(hint_parts)
-
-    label = ui.Text(f"{name}  ({hint})", variant="caption")
-
-    # Auto-increment PKs — skip from the form; DB generates
-    if is_auto:
-        return [label, ui.Text(
-            "(auto-generated on insert — skipped)",
-            variant="caption",
-        )]
-
-    if _is_boolean(ctype):
-        input_el = ui.Toggle(
-            label=name,
-            value=default_value in ("1", "true", "True"),
-            param_name=f"col__{name}",
-        )
-    elif _is_long_text(ctype):
-        input_el = ui.TextArea(
-            placeholder=f"NULL" if nullable and not default_value else "",
-            value=default_value,
-            rows=4,
-            param_name=f"col__{name}",
-        )
-    else:
-        placeholder = "NULL" if nullable and not default_value else ctype
-        input_el = ui.Input(
-            placeholder=placeholder,
-            value=default_value,
-            param_name=f"col__{name}",
-        )
-
-    return [label, input_el]
 
 
 # ─── Tab renderer ─────────────────────────────────────────────────────── #
@@ -147,19 +75,14 @@ async def append_row_form(
                      "are disabled to avoid affecting multiple rows. Use the SQL Editor."),
             type="warning",
         ))
-        _append_back_button(children, conn_id, table)
+        append_back_button(children, conn_id, table)
         return
 
     # ── Fetch current row for edit mode ───────────────────────────────
-    defaults = {"table": table, "note_id": conn_id, "tab": "row_form", "mode": mode}
     current_row: dict = {}
 
     if mode == "edit" and effective_pk and pk_value:
         try:
-            sql = (f"SELECT * FROM `{table}` "
-                   f"WHERE `{effective_pk}` = %s LIMIT 1")
-            # Re-use /query with inline parameter binding via placeholder emulation
-            # (backend's /query does not parameterize — we escape manually for SELECT only)
             safe_value = pk_value.replace("'", "''")
             query_sql = (f"SELECT * FROM `{table}` "
                          f"WHERE `{effective_pk}` = '{safe_value}' LIMIT 1")
@@ -176,7 +99,7 @@ async def append_row_form(
                     message=f"No row with {effective_pk}={pk_value} in {table}.",
                     type="warning",
                 ))
-                _append_back_button(children, conn_id, table)
+                append_back_button(children, conn_id, table)
                 return
         except Exception as e:
             children.append(ui.Alert(title="Row fetch failed", message=str(e), type="error"))
@@ -194,15 +117,13 @@ async def append_row_form(
     form_children: list = []
     for col in columns:
         col_name = col.get("COLUMN_NAME", "")
-        # For insert: no default. For edit: current value stringified
         raw_val = current_row.get(col_name, "") if mode == "edit" else ""
-        form_children.extend(_render_input(col, "" if raw_val is None else str(raw_val)))
+        form_children.extend(render_input(col, "" if raw_val is None else str(raw_val)))
 
-    # Routing params (tab/mode/table/pk) + column defaults.
-    # Column values go into defaults because FormContext only registers a
-    # child after the user edits it — pre-filled TextArea/Input/Toggle
-    # `value=` props don't travel on submit otherwise. Putting current row
-    # values in defaults guarantees untouched edit-mode fields submit.
+    # Routing params + column defaults. Column values go into defaults
+    # because FormContext only registers a child after the user edits it —
+    # pre-filled TextArea/Input/Toggle `value=` props don't travel on
+    # submit otherwise.
     form_defaults = {
         "note_id": conn_id,
         "table": table,
@@ -216,7 +137,7 @@ async def append_row_form(
             col_name = col.get("COLUMN_NAME", "")
             extra = col.get("EXTRA", "")
             if "auto_increment" in extra.lower():
-                continue  # auto PK — never submitted as a column value
+                continue
             raw_val = current_row.get(col_name)
             form_defaults[f"col__{col_name}"] = (
                 "" if raw_val is None else str(raw_val)
@@ -241,107 +162,12 @@ async def append_row_form(
             ),
         ))
 
-    _append_back_button(children, conn_id, table)
+    append_back_button(children, conn_id, table)
 
 
-def _append_back_button(children: list, conn_id: str, table: str) -> None:
-    """Back to Browse (results with SELECT * for this table)."""
-    children.append(ui.Button(
-        "Back to Browse", icon="ArrowLeft", variant="ghost", size="sm",
-        on_click=ui.Call(
-            "__panel__editor",
-            note_id=conn_id, tab="results", action="run",
-            sql=f"SELECT * FROM `{table}` LIMIT 200",
-        ),
-    ))
-
-
-# ─── Form submit handler (panel-side) ─────────────────────────────────── #
+# ─── Submit handler re-export ─────────────────────────────────────────── #
 #
-# The form submits to action="__panel__editor" with tab="row_form_submit".
-# The dispatcher in panels_editor.py routes that tab here for processing,
-# then re-renders row_form tab with a success/error Alert.
-# Form values arrive as col__<name> params — we strip the prefix and
-# dispatch to insert_row / update_row chat handlers.
+# panels_editor.py imports `process_row_form_submit` from this module.
+# Keep the name stable by re-exporting from the split submit module.
 
-async def process_row_form_submit(
-    children: list, ctx, uid: str, conn_id: str, conn_data: dict,
-    table: str, mode: str, pk_col: str, pk_value: str, form_params: dict,
-) -> None:
-    """Collect col__* params from form, dispatch to insert_row/update_row handler."""
-    # Extract col__<name> values into a dict
-    values = {}
-    for k, v in form_params.items():
-        if k.startswith("col__"):
-            col_name = k[len("col__"):]
-            # Skip empty strings on insert (let DB use DEFAULT)
-            if mode == "insert" and v == "":
-                continue
-            values[col_name] = v
-
-    if not values:
-        children.append(ui.Alert(
-            title="No changes",
-            message="Form is empty — nothing to save.", type="warning",
-        ))
-        _append_back_button(children, conn_id, table)
-        return
-
-    conn_info = build_conn_info(conn_data)
-
-    if mode == "insert":
-        payload = {
-            "user_id": uid, "operation": "insert",
-            "table": table, "values": values, "connection": conn_info,
-        }
-    else:
-        if not pk_col or not pk_value:
-            children.append(ui.Alert(
-                title="Missing PK",
-                message="Cannot update: primary key not provided.", type="error",
-            ))
-            _append_back_button(children, conn_id, table)
-            return
-        payload = {
-            "user_id": uid, "operation": "update",
-            "table": table, "values": values,
-            "where": {pk_col: pk_value},
-            "connection": conn_info,
-        }
-
-    try:
-        result = await _api_post(f"/v1/connections/{conn_id}/row", payload)
-    except Exception as e:
-        children.append(ui.Alert(title="Request failed", message=str(e), type="error"))
-        _append_back_button(children, conn_id, table)
-        return
-
-    if result.get("status") != "ok":
-        children.append(ui.Alert(
-            title="Save failed",
-            message=result.get("detail", "Unknown error"), type="error",
-        ))
-        _append_back_button(children, conn_id, table)
-        return
-
-    affected = result.get("rows_affected", 0)
-    if mode == "insert":
-        inserted_id = result.get("inserted_id")
-        msg = f"Inserted row" + (f" (id={inserted_id})" if inserted_id else "")
-    else:
-        msg = f"Updated {affected} row(s)"
-
-    children.append(ui.Alert(title="Saved", message=msg, type="success"))
-
-    # Row form DML also bypasses @chat.function — pulse the sidebar event
-    # the same way the SQL Editor's Execute path does.
-    try:
-        if hasattr(ctx, "extensions") and ctx.extensions is not None:
-            await ctx.extensions.call(
-                "sql-db", "_pulse_sql_executed",
-                {"kind": f"row_form_{mode}"},
-            )
-    except Exception as e:
-        log.debug("sql.executed pulse skipped: %s", e)
-
-    _append_back_button(children, conn_id, table)
+from _row_form_submit import process_row_form_submit  # noqa: E402, F401
