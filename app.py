@@ -151,7 +151,9 @@ async def resolve_connection(ctx) -> tuple[dict | None, str]:
     except Exception:
         pass
 
-    # Fallback: any connection for this user
+    # Fallback: any connection for this user. Logged so support can trace
+    # surprising "wrong database" UX when a user has prod+staging saved
+    # but neither is marked active.
     try:
         page = await ctx.store.query(
             CONN_COLLECTION,
@@ -159,7 +161,12 @@ async def resolve_connection(ctx) -> tuple[dict | None, str]:
             limit=1,
         )
         if page.data:
-            return page.data[0].data, page.data[0].id
+            conn = page.data[0].data
+            log.warning(
+                "resolve_connection: no active connection for user=%s, falling back to '%s' (id=%s)",
+                uid, conn.get("name", "?"), page.data[0].id,
+            )
+            return conn, page.data[0].id
     except Exception:
         pass
 
@@ -197,7 +204,11 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 # ─── Extension ────────────────────────────────────────────────────────── #
 
-ext = Extension("sql-db", version="1.0.0")
+ext = Extension(
+    "sql-db",
+    version="1.3.0",
+    capabilities=["sql-db:read", "sql-db:write"],
+)
 
 chat = ChatExtension(
     ext=ext,

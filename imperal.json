@@ -1,32 +1,14 @@
 {
   "app_id": "sql-db",
-  "version": "1.0.0",
-  "capabilities": [],
+  "version": "1.3.0",
+  "capabilities": ["sql-db:read", "sql-db:write"],
   "tools": [
     {
       "name": "tool_sql_db_chat",
       "description": "SQL Database assistant — connect to MySQL/MariaDB databases, browse schema and tables, run SELECT queries, execute DML/DDL (INSERT, UPDATE, DELETE, ALTER, CREATE, DROP), insert/update/delete single rows, natural-language to SQL (nl_to_sql), explain execution plans, dry-run writes, manage saved queries, view SQL query execution history, switch between connections. NOT for email or chat message history, application audit logs, file contents, notes, or NoSQL stores.",
-      "scopes": ["*"],
+      "scopes": [],
       "parameters": {
         "message": {"type": "string", "required": false},
-        "kwargs": {"type": "string", "required": true}
-      }
-    },
-    {
-      "name": "skeleton_refresh_db_schema",
-      "description": "Background refresh: database schema cache for active connection.",
-      "scopes": ["sql-db.read"],
-      "parameters": {
-        "kwargs": {"type": "string", "required": true}
-      }
-    },
-    {
-      "name": "skeleton_alert_db_schema",
-      "description": "Alert on schema changes (tables added or removed).",
-      "scopes": ["sql-db.read"],
-      "parameters": {
-        "old": {"type": "string", "required": false},
-        "new": {"type": "string", "required": false},
         "kwargs": {"type": "string", "required": true}
       }
     },
@@ -49,5 +31,5 @@
   ],
   "signals": [],
   "schedules": [],
-  "required_scopes": ["*", "sql-db.read", "sql-db.write"]
+  "required_scopes": ["sql-db:read", "sql-db:write"]
 }
