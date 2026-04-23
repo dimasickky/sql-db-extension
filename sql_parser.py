@@ -63,3 +63,30 @@ def classify_sql(sql_clean: str) -> tuple[str, bool, bool]:
         is_read = first_word in ("SELECT", "SHOW", "DESCRIBE", "DESC")
 
     return first_word, is_read, is_explain
+
+
+# ─── Best-effort table extractor for write statements ─────────────────── #
+
+import re as _re
+
+_TABLE_AFTER = _re.compile(
+    r"\b(?:INTO|FROM|UPDATE|TABLE)\s+`?([A-Za-z_][A-Za-z0-9_]*)`?",
+    _re.IGNORECASE,
+)
+
+
+def extract_target_tables(sql: str) -> list[str]:
+    """Heuristic: pull table names after INTO/FROM/UPDATE/TABLE.
+
+    Intentionally conservative — returns [] for anything non-obvious (e.g.
+    subqueries, derived tables). Callers MUST treat [] as "unknown, skip
+    validation" rather than "no tables".
+    """
+    if not sql:
+        return []
+    seen: list[str] = []
+    for m in _TABLE_AFTER.finditer(sql):
+        name = m.group(1)
+        if name and name.upper() not in {"SELECT", "WHERE", "SET", "VALUES"} and name not in seen:
+            seen.append(name)
+    return seen
