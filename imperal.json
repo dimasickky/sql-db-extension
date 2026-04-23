@@ -1,15 +1,24 @@
 {
   "app_id": "sql-db",
-  "version": "1.3.0",
-  "capabilities": ["sql-db:read", "sql-db:write"],
+  "version": "1.3.1",
+  "capabilities": [
+    "sql-db:read",
+    "sql-db:write"
+  ],
   "tools": [
     {
       "name": "tool_sql_db_chat",
-      "description": "SQL Database assistant — connect to MySQL/MariaDB databases, browse schema and tables, run SELECT queries, execute DML/DDL (INSERT, UPDATE, DELETE, ALTER, CREATE, DROP), insert/update/delete single rows, natural-language to SQL (nl_to_sql), explain execution plans, dry-run writes, manage saved queries, view SQL query execution history, switch between connections. NOT for email or chat message history, application audit logs, file contents, notes, or NoSQL stores.",
+      "description": "SQL Database assistant \u2014 connect to MySQL/MariaDB databases, browse schema and tables, run SELECT queries, execute DML/DDL (INSERT, UPDATE, DELETE, ALTER, CREATE, DROP), insert/update/delete single rows, natural-language to SQL (nl_to_sql), explain execution plans, dry-run writes, manage saved queries, view SQL query execution history, switch between connections. NOT for email or chat message history, application audit logs, file contents, notes, or NoSQL stores.",
       "scopes": [],
       "parameters": {
-        "message": {"type": "string", "required": false},
-        "kwargs": {"type": "string", "required": true}
+        "message": {
+          "type": "string",
+          "required": false
+        },
+        "kwargs": {
+          "type": "string",
+          "required": true
+        }
       }
     },
     {
@@ -17,7 +26,10 @@
       "description": "Panel: SQL DB",
       "scopes": [],
       "parameters": {
-        "params": {"type": "string", "required": true}
+        "params": {
+          "type": "string",
+          "required": true
+        }
       }
     },
     {
@@ -25,11 +37,17 @@
       "description": "Panel: SQL Editor",
       "scopes": [],
       "parameters": {
-        "params": {"type": "string", "required": true}
+        "params": {
+          "type": "string",
+          "required": true
+        }
       }
     }
   ],
   "signals": [],
   "schedules": [],
-  "required_scopes": ["sql-db:read", "sql-db:write"]
+  "required_scopes": [
+    "sql-db:read",
+    "sql-db:write"
+  ]
 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, _api_post, _user_id, build_conn_info
+from app import chat, ActionResult, _api_post, require_user_id, build_conn_info
 from handlers_query import _resolve, RunQueryParams, ExplainParams  # noqa: F401
 from schema_guard import list_known_tables
 from sql_parser import extract_target_tables
@@ -73,7 +73,7 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
             )
 
         result = await _api_post(f"/v1/connections/{conn_id}/execute", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "sql": sql,
             "confirmed": True,
             "connection": build_conn_info(conn),
@@ -131,7 +131,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
         if not inner_sql:
             return ActionResult.error("EXPLAIN requires a query after it.")
         result = await _api_post(f"/v1/connections/{conn_id}/explain", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "sql": inner_sql,
             "connection": build_conn_info(conn),
         })
@@ -144,7 +144,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
 
     if is_read:
         result = await _api_post(f"/v1/connections/{conn_id}/query", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "sql": sql,
             "limit": 100,
             "connection": build_conn_info(conn),
@@ -163,7 +163,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
 
     # DML/DDL
     result = await _api_post(f"/v1/connections/{conn_id}/execute", {
-        "user_id": _user_id(ctx),
+        "user_id": require_user_id(ctx),
         "sql": sql,
         "confirmed": True,
         "connection": build_conn_info(conn),

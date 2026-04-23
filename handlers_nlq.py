@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, _api_post, _user_id, get_active_connection, build_conn_info
+from app import chat, ActionResult, _api_post, require_user_id, get_active_connection, build_conn_info
 from handlers_query import _resolve
 
 
@@ -40,7 +40,7 @@ async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
         if not schema_data or not schema_data.get("tables"):
             # Fetch fresh schema
             result = await _api_post(f"/v1/connections/{conn_id}/schema", {
-                "user_id": _user_id(ctx),
+                "user_id": require_user_id(ctx),
                 "database": database,
                 "connection": build_conn_info(conn),
             })

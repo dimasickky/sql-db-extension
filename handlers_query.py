@@ -4,7 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app import (
-    chat, ActionResult, _api_post, _user_id,
+    chat, ActionResult, _api_post, require_user_id,
     resolve_connection, get_connection_by_id, build_conn_info,
 )
 
@@ -82,7 +82,7 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
             return ActionResult.error("No active connection. Use add_connection first.")
 
         result = await _api_post(f"/v1/connections/{conn_id}/query", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "sql": sql,
             "limit": params.limit,
             "connection": build_conn_info(conn),
@@ -120,7 +120,7 @@ async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
             return ActionResult.error("No database specified. Provide database name.")
 
         result = await _api_post(f"/v1/connections/{conn_id}/schema", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "database": database,
             "connection": build_conn_info(conn),
         })
@@ -146,7 +146,7 @@ async def fn_explain_query(ctx, params: ExplainParams) -> ActionResult:
             return ActionResult.error("No active connection.")
 
         result = await _api_post(f"/v1/connections/{conn_id}/explain", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "sql": params.sql,
             "connection": build_conn_info(conn),
         })
@@ -171,7 +171,7 @@ async def fn_dry_run(ctx, params: DryRunParams) -> ActionResult:
             return ActionResult.error("No active connection.")
 
         result = await _api_post(f"/v1/connections/{conn_id}/dry_run", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "sql": params.sql,
             "connection": build_conn_info(conn),
         })

@@ -4,7 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app import (
-    chat, ActionResult, _api_post, _user_id, _tenant_id,
+    chat, ActionResult, _api_post, require_user_id, _tenant_id,
     encrypt_password, build_conn_info,
     CONN_COLLECTION, get_active_connection, get_connection_by_id,
 )
@@ -58,7 +58,7 @@ class ResolveConnByDbParams(BaseModel):
 )
 async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
     """Add a new MySQL/MariaDB connection. Tests before saving."""
-    uid = _user_id(ctx)
+    uid = require_user_id(ctx)
     try:
         pwd_enc = encrypt_password(params.password)
         conn_info = {
@@ -117,7 +117,7 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
 )
 async def fn_list_connections(ctx) -> ActionResult:
     """List all saved database connections."""
-    uid = _user_id(ctx)
+    uid = require_user_id(ctx)
     try:
         page = await ctx.store.query(CONN_COLLECTION, where={"user_id": uid}, limit=100)
         connections = [{
@@ -150,7 +150,7 @@ async def fn_resolve_connection_by_database(
     ctx, params: ResolveConnByDbParams,
 ) -> ActionResult:
     """Return {connection_id} for a saved connection matching database_name or name."""
-    uid = _user_id(ctx)
+    uid = require_user_id(ctx)
     target = (params.database_name or "").strip()
     if not target or target in ("database_name", "connection_id"):
         return ActionResult.error(
@@ -211,7 +211,7 @@ async def fn_test_connection(ctx, params: ConnectionIdParams) -> ActionResult:
             return ActionResult.error("Connection not found")
 
         result = await _api_post("/v1/connections/test", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "connection": build_conn_info(conn),
         })
 
@@ -231,7 +231,7 @@ async def fn_test_connection(ctx, params: ConnectionIdParams) -> ActionResult:
 )
 async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionResult:
     """Switch active connection."""
-    uid = _user_id(ctx)
+    uid = require_user_id(ctx)
     try:
         target = await get_connection_by_id(ctx, params.connection_id)
         if not target:
