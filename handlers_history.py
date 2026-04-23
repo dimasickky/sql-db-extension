@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, _api_get, _api_post, _api_delete, _api_patch, _user_id, build_conn_info
+from app import chat, ActionResult, _api_get, _api_post, _api_delete, _api_patch, require_user_id, build_conn_info
 from handlers_query import _resolve
 
 
@@ -55,7 +55,7 @@ async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
 
         result = await _api_get(
             f"/v1/connections/{conn_id}/history",
-            {"user_id": _user_id(ctx), "limit": params.limit},
+            {"user_id": require_user_id(ctx), "limit": params.limit},
         )
 
         return ActionResult.success(
@@ -78,7 +78,7 @@ async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
             return ActionResult.error("No active connection.")
 
         result = await _api_post(f"/v1/connections/{conn_id}/saved", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "conn_id": conn_id,
             "name": params.name,
             "sql_text": params.sql_text,
@@ -106,7 +106,7 @@ async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
 
         result = await _api_get(
             f"/v1/connections/{conn_id}/saved",
-            {"user_id": _user_id(ctx)},
+            {"user_id": require_user_id(ctx)},
         )
 
         queries = result.get("saved_queries", [])
@@ -132,7 +132,7 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
         # Get the saved query
         saved_list = await _api_get(
             f"/v1/connections/{conn_id}/saved",
-            {"user_id": _user_id(ctx)},
+            {"user_id": require_user_id(ctx)},
         )
         target = None
         for q in saved_list.get("saved_queries", []):
@@ -144,7 +144,7 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
 
         # Execute it
         result = await _api_post(f"/v1/connections/{conn_id}/query", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "sql": target["sql_text"],
             "limit": 100,
             "connection": build_conn_info(conn),
@@ -178,7 +178,7 @@ async def fn_delete_saved(ctx, params: DeleteSavedParams) -> ActionResult:
 
         await _api_delete(
             f"/v1/connections/{conn_id}/saved/{params.query_id}",
-            {"user_id": _user_id(ctx)},
+            {"user_id": require_user_id(ctx)},
         )
 
         return ActionResult.success(

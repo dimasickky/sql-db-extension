@@ -91,7 +91,32 @@ def _safe_json(resp) -> dict:
 # ─── Helpers ──────────────────────────────────────────────────────────── #
 
 def _user_id(ctx) -> str:
+    """Tolerant user-id read. Returns '' on missing ctx.user.
+
+    Use from panel / skeleton renderers that must survive anonymous
+    sessions. Chat handlers MUST use require_user_id() instead so an
+    empty ctx fails loudly rather than silently scoping every backend
+    query to no-user.
+    """
     return ctx.user.id if hasattr(ctx, "user") and ctx.user else ""
+
+
+def require_user_id(ctx) -> str:
+    """Return ctx.user.id or raise. Use from every @chat.function handler.
+
+    When a chain step arrives without ctx.user populated (kernel-side bug
+    class observed 2026-04-23), a silent "" would scope every backend
+    query to no-user and hand back empty lists — indistinguishable from
+    a real empty collection. Raising makes the failure loud and catchable
+    by the handler's except-clause (surfaces as ActionResult.error).
+    """
+    uid = _user_id(ctx)
+    if not uid:
+        raise RuntimeError(
+            "No authenticated user on context. Refusing to query db-service "
+            "with an empty user_id (would silently return no data)."
+        )
+    return uid
 
 
 def _tenant_id(ctx) -> str:
@@ -206,7 +231,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "sql-db",
-    version="1.3.0",
+    version="1.3.1",
     capabilities=["sql-db:read", "sql-db:write"],
 )
 

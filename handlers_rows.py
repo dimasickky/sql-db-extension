@@ -10,7 +10,7 @@ import json as _json
 
 from pydantic import BaseModel, Field
 
-from app import chat, ActionResult, _api_post, _user_id, build_conn_info
+from app import chat, ActionResult, _api_post, require_user_id, build_conn_info
 from handlers_query import _resolve as _query_resolve
 from schema_guard import validate_columns, validate_table_exists
 
@@ -115,7 +115,7 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
             return ActionResult.error("No active connection")
 
         result = await _api_post(f"/v1/connections/{conn_id}/row", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "operation": "insert",
             "table": params.table,
             "values": values,
@@ -163,7 +163,7 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
             return ActionResult.error("No active connection")
 
         result = await _api_post(f"/v1/connections/{conn_id}/row", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "operation": "update",
             "table": params.table,
             "values": values,
@@ -203,7 +203,7 @@ async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
             return ActionResult.error("No active connection")
 
         result = await _api_post(f"/v1/connections/{conn_id}/row", {
-            "user_id": _user_id(ctx),
+            "user_id": require_user_id(ctx),
             "operation": "delete",
             "table": params.table,
             "where": {params.pk_col: params.pk_value},
