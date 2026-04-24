@@ -1,16 +1,25 @@
-"""sql-db · Shared state & extension setup."""
+"""sql-db · SqlDbExtension instance, db-service HTTP client, Fernet helpers.
+
+Loader entry point: module-level ``ext`` is the Extension subclass instance
+the kernel discovers by duck-typing (``hasattr(attr, 'tools')``). Panels and
+skeleton bind against this instance unchanged.
+
+The Fernet key is loaded lazily so the validator (which may import
+``main.py`` before worker secrets are wired) doesn't fail at import time.
+"""
 from __future__ import annotations
 
 import logging
 import os
 
-from imperal_sdk import Extension
-from imperal_sdk.chat import ChatExtension, ActionResult
+from imperal_sdk.http import HTTPClient
+
+from tools import SqlDbExtension
 
 log = logging.getLogger("sql-db")
 
 
-# ─── Config ───────────────────────────────────────────────────────────── #
+# ─── Config ──────────────────────────────────────────────────────────── #
 
 DB_SERVICE_URL = os.environ["DB_SERVICE_URL"]
 DB_SERVICE_KEY = os.getenv("DB_SERVICE_KEY", "")
@@ -19,7 +28,7 @@ SQL_DB_ENCRYPTION_KEY = os.getenv("SQL_DB_ENCRYPTION_KEY", "")
 CONN_COLLECTION = "db_connections"
 
 
-# ─── Fernet (encrypt passwords before sending to backend) ─────────────── #
+# ─── Fernet — lazy, first call only ──────────────────────────────────── #
 
 _fernet = None
 
@@ -35,19 +44,21 @@ def _get_fernet():
 
 
 def encrypt_password(plaintext: str) -> str:
+    """Fernet-encrypt a DB password at the extension boundary.
+
+    Passwords NEVER leave this extension in plaintext: every call into the
+    db-service carries ``password_encrypted`` only, and db-service / MariaDB
+    never see the Fernet key. Losing the Fernet key = losing every saved
+    password — back it up out-of-band.
+    """
     return _get_fernet().encrypt(plaintext.encode()).decode()
 
 
-# ─── HTTP via SDK HTTPClient (replaces direct httpx.AsyncClient) ──────── #
+# ─── HTTP client (module-level, SDK HTTPClient) ──────────────────────── #
 #
-# We use imperal_sdk.http.HTTPClient directly (not ctx.http) because our
-# _api_* helpers are module-level and called from panel render paths and
-# handlers alike — threading ctx through every layer would be invasive.
-# HTTPClient is the same wrapper ctx.http uses under the hood: typed
-# HTTPResponse (.status_code / .body / .ok / .json()) and no hidden state
-# that could bleed across tenants (per-request httpx.AsyncClient per call).
-
-from imperal_sdk.http import HTTPClient
+# Same wrapper ctx.http uses — typed HTTPResponse, per-request
+# httpx.AsyncClient, no cross-tenant state. Module-level because _api_*
+# helpers are shared across tools, panels, and skeleton refreshers.
 
 _http_client: HTTPClient | None = None
 
@@ -68,7 +79,6 @@ def _auth_headers() -> dict:
 
 
 def _extract_error(resp) -> dict:
-    """Extract error detail from a failed HTTPResponse (SDK shape)."""
     body = resp.body
     if isinstance(body, dict):
         detail = body.get("detail") or str(body)
@@ -81,40 +91,24 @@ def _extract_error(resp) -> dict:
 
 
 def _safe_json(resp) -> dict:
-    """Return resp.json() or a synthetic error dict if body isn't JSON."""
     try:
         return resp.json()
     except Exception:
         return {"status": "error", "detail": str(resp.body)[:500]}
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────── #
+# ─── Identity helpers ─────────────────────────────────────────────────── #
 
 def _user_id(ctx) -> str:
-    """Tolerant user-id read. Returns '' on missing ctx.user.
-
-    Use from panel / skeleton renderers that must survive anonymous
-    sessions. Chat handlers MUST use require_user_id() instead so an
-    empty ctx fails loudly rather than silently scoping every backend
-    query to no-user.
-    """
     return ctx.user.id if hasattr(ctx, "user") and ctx.user else ""
 
 
 def require_user_id(ctx) -> str:
-    """Return ctx.user.id or raise. Use from every @chat.function handler.
-
-    When a chain step arrives without ctx.user populated (kernel-side bug
-    class observed 2026-04-23), a silent "" would scope every backend
-    query to no-user and hand back empty lists — indistinguishable from
-    a real empty collection. Raising makes the failure loud and catchable
-    by the handler's except-clause (surfaces as ActionResult.error).
-    """
     uid = _user_id(ctx)
     if not uid:
         raise RuntimeError(
             "No authenticated user on context. Refusing to query db-service "
-            "with an empty user_id (would silently return no data)."
+            "with an empty user_id (silently returns 0 rows = wrong data).",
         )
     return uid
 
@@ -125,6 +119,8 @@ def _tenant_id(ctx) -> str:
     return "default"
 
 
+# ─── Backend API helpers ─────────────────────────────────────────────── #
+
 async def _api_post(path: str, data: dict) -> dict:
     r = await _http().post(_db_url(path), json=data, headers=_auth_headers())
     if not r.ok:
@@ -132,15 +128,17 @@ async def _api_post(path: str, data: dict) -> dict:
     return _safe_json(r)
 
 
-async def _api_get(path: str, params: dict = None) -> dict:
+async def _api_get(path: str, params: dict | None = None) -> dict:
     r = await _http().get(_db_url(path), params=params or {}, headers=_auth_headers())
     if not r.ok:
         return _extract_error(r)
     return _safe_json(r)
 
 
-async def _api_delete(path: str, params: dict = None) -> dict:
-    r = await _http().delete(_db_url(path), params=params or {}, headers=_auth_headers())
+async def _api_delete(path: str, params: dict | None = None) -> dict:
+    r = await _http().delete(
+        _db_url(path), params=params or {}, headers=_auth_headers(),
+    )
     if not r.ok:
         return _extract_error(r)
     return _safe_json(r)
@@ -155,40 +153,33 @@ async def _api_patch(path: str, params: dict, data: dict) -> dict:
     return _safe_json(r)
 
 
-# ─── Connection helpers ───────────────────────────────────────────────── #
+# ─── Connection resolution ───────────────────────────────────────────── #
 
 async def resolve_connection(ctx) -> tuple[dict | None, str]:
-    """Find active connection. Fallback: first connection of user.
+    """Find active connection, with a sane fallback to any saved one.
 
-    Returns (conn_data, conn_id) or (None, "").
+    The fallback is logged because silent "wrong database" UX confuses
+    users who have prod + staging saved but neither marked active.
     """
     uid = _user_id(ctx)
 
-    # Try is_active filter first
     try:
         page = await ctx.store.query(
-            CONN_COLLECTION,
-            where={"user_id": uid, "is_active": True},
-            limit=1,
+            CONN_COLLECTION, where={"user_id": uid, "is_active": True}, limit=1,
         )
         if page.data:
             return page.data[0].data, page.data[0].id
     except Exception:
         pass
 
-    # Fallback: any connection for this user. Logged so support can trace
-    # surprising "wrong database" UX when a user has prod+staging saved
-    # but neither is marked active.
     try:
         page = await ctx.store.query(
-            CONN_COLLECTION,
-            where={"user_id": uid},
-            limit=1,
+            CONN_COLLECTION, where={"user_id": uid}, limit=1,
         )
         if page.data:
             conn = page.data[0].data
             log.warning(
-                "resolve_connection: no active connection for user=%s, falling back to '%s' (id=%s)",
+                "resolve_connection: no active for user=%s, falling back to '%s' (id=%s)",
                 uid, conn.get("name", "?"), page.data[0].id,
             )
             return conn, page.data[0].id
@@ -199,55 +190,36 @@ async def resolve_connection(ctx) -> tuple[dict | None, str]:
 
 
 async def get_active_connection(ctx) -> dict | None:
-    """Get active connection data (or first available)."""
     conn, _ = await resolve_connection(ctx)
     return conn
 
 
 async def get_connection_by_id(ctx, conn_id: str) -> dict | None:
-    """Get a specific connection from ctx.store."""
     doc = await ctx.store.get(CONN_COLLECTION, conn_id)
     return doc.data if doc else None
 
 
 def build_conn_info(conn: dict) -> dict:
-    """Build ConnInfo dict for backend requests."""
+    """Serialise a saved connection row into the wire shape db-service wants."""
     return {
-        "host": conn["host"],
-        "port": conn.get("port", 3306),
-        "user": conn["db_user"],
+        "host":               conn["host"],
+        "port":               conn.get("port", 3306),
+        "user":               conn["db_user"],
         "password_encrypted": conn["password_encrypted"],
-        "database": conn.get("database", ""),
+        "database":           conn.get("database", ""),
     }
 
 
-# ─── System Prompt ────────────────────────────────────────────────────── #
+# ─── Extension instance (loader entry point) ─────────────────────────── #
 
-from pathlib import Path as _Path
-SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
-
-
-# ─── Extension ────────────────────────────────────────────────────────── #
-
-ext = Extension(
-    "sql-db",
-    version="1.3.1",
+ext = SqlDbExtension(
+    app_id="sql-db",
+    version="2.0.0",
     capabilities=["sql-db:read", "sql-db:write"],
 )
 
-chat = ChatExtension(
-    ext=ext,
-    tool_name="tool_sql_db_chat",
-    description=(
-        "SQL Database assistant — connect to MySQL/MariaDB databases, "
-        "browse schema, run queries, explain plans, manage saved queries"
-    ),
-    system_prompt=SYSTEM_PROMPT,
-    model="claude-haiku-4-5-20251001",
-)
 
-
-# ─── Health Check ─────────────────────────────────────────────────────── #
+# ─── Health ──────────────────────────────────────────────────────────── #
 
 @ext.health_check
 async def health(ctx) -> dict:
@@ -260,8 +232,6 @@ async def health(ctx) -> dict:
     except Exception:
         return {"status": "degraded", "version": ext.version, "backend": "unreachable"}
 
-
-# ─── Lifecycle ────────────────────────────────────────────────────────── #
 
 @ext.on_install
 async def on_install(ctx):

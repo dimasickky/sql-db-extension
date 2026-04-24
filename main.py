@@ -1,26 +1,34 @@
-"""sql-db v1.2.1 · pagination + sidebar-refresh pulse on panel DML."""
+"""sql-db v2.0.0 · MySQL / MariaDB assistant.
+
+SDK v2.0.0 / Webbee Single Voice — class-based tool surface, no ChatExtension,
+no per-extension system prompt. Webbee Narrator composes all user-facing
+prose kernel-side from the typed output schemas in ``schemas.py``.
+"""
 from __future__ import annotations
 
-import sys, os
+import os
+import sys
+
 _dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, _dir)
-for _m in [k for k in sys.modules if k in (
-    "app", "handlers_connections", "handlers_query", "handlers_execute",
-    "handlers_nlq", "handlers_history", "handlers_rows",
-    "skeleton", "panels", "panels_editor",
-    "panels_editor_results", "panels_editor_tabs", "panels_editor_row_form",
-    "sql_parser",
-)]:
+if _dir not in sys.path:
+    sys.path.insert(0, _dir)
+
+for _m in [
+    k for k in list(sys.modules)
+    if k in (
+        "app", "tools", "schemas",
+        "schema_guard", "sql_parser",
+        "skeleton",
+        "panels",
+        "panels_editor", "panels_editor_results", "panels_editor_tabs",
+        "panels_editor_row_form",
+        "_editor_result_renderers", "_row_form_inputs", "_row_form_submit",
+    )
+]:
     del sys.modules[_m]
 
-from app import ext, chat  # noqa: F401
+from app import ext  # noqa: F401,E402  (loader discovers this)
 
-import handlers_connections    # noqa: F401
-import handlers_query          # noqa: F401
-import handlers_execute        # noqa: F401
-import handlers_nlq            # noqa: F401
-import handlers_history        # noqa: F401
-import handlers_rows           # noqa: F401  # row CRUD (insert/update/delete)
-import skeleton                # noqa: F401
-import panels                  # noqa: F401
-import panels_editor           # noqa: F401  # center overlay SQL editor
+import skeleton       # noqa: F401,E402
+import panels         # noqa: F401,E402
+import panels_editor  # noqa: F401,E402

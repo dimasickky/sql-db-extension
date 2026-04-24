@@ -6,6 +6,78 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.0.0] — 2026-04-24
+
+**BREAKING · SDK v2.0.0 / Webbee Single Voice migration.**
+
+Full rebuild on the v2.0 class-based tool surface. No ChatExtension, no
+per-extension system prompt — Webbee Narrator composes all user-facing
+prose kernel-side from typed output schemas. All 22 business operations
+preserved; wire contract with db-service (api-server:8099) unchanged.
+
+### Added
+- **`schemas.py`** — 22 Pydantic output schemas with `ok: bool` +
+  `error: str | None` base and rich leaf types (ConnectionRef,
+  TableInfo, ColumnInfo, HistoryEntry, SavedQuery). Row values pass
+  through as `dict[str, Any]` so the Narrator can quote cells verbatim.
+- **`tools.py` · `SqlDbExtension(Extension)`** — class-based tool host
+  with 22 `@sdk_ext.tool` methods. Direct-arg signatures, explicit `ctx`.
+- **`llm_backed=True`** on `nl_to_sql` — federal BYOLLM routing applies,
+  `ctx.ai.complete(prompt, purpose="execution")`, fallback to
+  purposeless call on older kernels.
+- **`cost_credits=1`** on destructive tools (`execute_sql`,
+  `delete_row`, `delete_saved`, `delete_connection`) — pre-ACK
+  confirmation gate always fires regardless of user setting.
+- **Loud-fail zero-row writes** preserved in `execute_sql` for
+  INSERT/UPDATE/DELETE/REPLACE — surfaces phantom success to
+  the Narrator as `ok=False, error="... 0 rows affected"`.
+
+### Removed
+- **`ChatExtension`** + `tool_sql_db_chat` orchestrator.
+- **`_system_prompt` + `system_prompt.txt`** (I-LOADER-REJECT-SYSTEM-PROMPT).
+- **`@chat.function` + `ActionResult.success/.error`** envelope —
+  replaced by `@sdk_ext.tool` + typed output schemas.
+- **`action_type="read|write|destructive"`** — coarse signal moved to
+  Navigation classifier; destructive gating via `cost_credits`.
+- **`event="sql.executed" / "connection.added" / ...`** kwargs — event
+  publishing is kernel-side in v2; extensions return data only.
+- **`handlers_connections.py`, `handlers_query.py`, `handlers_execute.py`,
+  `handlers_nlq.py`, `handlers_history.py`, `handlers_rows.py`** —
+  collapsed into `tools.py` + `schemas.py`.
+
+### Changed
+- **Scope naming** — `sql-db.read` → `sql-db:read` (colon canonical) on
+  skeleton alert tool + everywhere else.
+- **`imperal.json`** — `sdk_version: "2.0.0"`, per-tool minimal scopes
+  + descriptions, legacy `tool_sql_db_chat` entry removed.
+- **`requirements.txt`** — `imperal-sdk>=2.0.0,<3.0.0` + explicit
+  `cryptography>=42` (was transitively pulled before).
+
+### Preserved (unchanged)
+- Fernet password encryption at the extension boundary — passwords
+  NEVER leave sql-db in plaintext. `SQL_DB_ENCRYPTION_KEY` must be
+  backed up out-of-band (losing = losing every saved password).
+- Client-side `schema_guard` gate on row-level CRUD and `execute_sql`
+  — rejects unknown tables / columns before the round-trip when the
+  skeleton cache has a concrete schema.
+- `sql_parser.extract_target_tables` — ambiguity-tolerant verb/table
+  extraction; CTEs / DDL / subqueries skip the gate.
+- `panels.py` + `panels_editor*.py` + `_editor_result_renderers.py` +
+  `_row_form_*.py` — DUI editor/results/row-form stack unchanged,
+  imports from `app` preserved.
+- Skeleton `@ext.skeleton("db_schema", alert=True, ttl=300)` plus
+  companion `skeleton_alert_db_schema` tool.
+- Wire contract to db-service (paths, `user_id` in query, `connection`
+  envelope in body for mutations, response shapes).
+
+### Migration
+Developer Portal redeploy from `sdk-v2-migration` branch. Saved
+connections and history rows in ctx.store carry the same shape.
+Rollback: checkout tag `v1.3.1` + `pip install imperal-sdk==1.6.2` in
+the worker venv + restart kernel.
+
+---
+
 ## [1.3.1] — 2026-04-23
 
 Symmetry patch bringing sql-db onto the same fail-fast ctx contract as notes 2.4.1. No behaviour changes except: a chain step arriving without `ctx.user` populated now produces a loud `ActionResult.error("No authenticated user…")` instead of silently scoping every `ctx.store` / db-service query to `user_id=""` and returning empty collections (indistinguishable from a real empty list).
