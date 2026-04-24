@@ -1,1 +1,2 @@
-imperal-sdk>=1.5.26,<1.6
+imperal-sdk>=2.0.0,<3.0.0
+cryptography>=42
