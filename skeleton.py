@@ -84,7 +84,7 @@ async def skeleton_refresh_db_schema(ctx, **kwargs) -> dict:
 
 @ext.tool(
     "skeleton_alert_db_schema",
-    scopes=["sql-db.read"],
+    scopes=[],
     description="Alert on schema changes (tables added or removed).",
 )
 async def skeleton_alert_db_schema(
