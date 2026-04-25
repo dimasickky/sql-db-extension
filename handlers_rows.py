@@ -12,7 +12,11 @@ from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _api_post, require_user_id, build_conn_info
 from handlers_query import _resolve as _query_resolve
-from schema_guard import validate_columns, validate_table_exists
+from schema_guard import (
+    load_schema_section,
+    validate_columns,
+    validate_table_exists,
+)
 
 
 # ─── Event pulse (internal) ───────────────────────────────────────────── #
@@ -102,12 +106,13 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
         if not values:
             return ActionResult.error("No values to insert")
 
-        # Skeleton-cheap gate: if we've cached the table's schema, reject
-        # unknown columns before the round-trip. Silent no-op when skeleton
-        # is cold.
-        if (t_err := validate_table_exists(ctx, params.table)):
+        # Cache-cheap gate: if we've cached the table's schema, reject
+        # unknown columns before the round-trip. Silent no-op when cache
+        # is cold (returns {}, validators skip).
+        section = await load_schema_section(ctx)
+        if (t_err := validate_table_exists(section, params.table)):
             return ActionResult.error(t_err)
-        if (c_err := validate_columns(ctx, params.table, list(values.keys()))):
+        if (c_err := validate_columns(section, params.table, list(values.keys()))):
             return ActionResult.error(c_err)
 
         conn, conn_id = await _resolve(ctx, params.connection_id)
@@ -150,12 +155,13 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
         if not values:
             return ActionResult.error("No changes to apply")
 
-        # Skeleton-cheap gate: unknown table / columns (including pk_col)
+        # Cache-cheap gate: unknown table / columns (including pk_col)
         # are rejected before the round-trip.
-        if (t_err := validate_table_exists(ctx, params.table)):
+        section = await load_schema_section(ctx)
+        if (t_err := validate_table_exists(section, params.table)):
             return ActionResult.error(t_err)
         referenced = list(values.keys()) + [params.pk_col]
-        if (c_err := validate_columns(ctx, params.table, referenced)):
+        if (c_err := validate_columns(section, params.table, referenced)):
             return ActionResult.error(c_err)
 
         conn, conn_id = await _resolve(ctx, params.connection_id)
@@ -193,9 +199,10 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
 async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
     """Delete a single row identified by primary key. Requires confirmation."""
     try:
-        if (t_err := validate_table_exists(ctx, params.table)):
+        section = await load_schema_section(ctx)
+        if (t_err := validate_table_exists(section, params.table)):
             return ActionResult.error(t_err)
-        if (c_err := validate_columns(ctx, params.table, [params.pk_col])):
+        if (c_err := validate_columns(section, params.table, [params.pk_col])):
             return ActionResult.error(c_err)
 
         conn, conn_id = await _resolve(ctx, params.connection_id)

@@ -6,6 +6,42 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.3.3] — 2026-04-26
+
+Fix the 1054 column-hallucination class. Pre-write validation moves off the dead `ctx.skeleton_data` path (gone since SDK 1.6.0) onto the supported `ctx.cache` channel, with the `@ext.skeleton('db_schema')` refresher mirroring its payload to a Pydantic-typed cache entry that `@chat.function` handlers can read.
+
+The same skeleton snapshot is now visible from both surfaces — read-only LLM envelope (classifier) and read/write cache (write-time guard) — without violating the v1.6.0 `SkeletonAccessForbidden` boundary.
+
+### Added
+
+- **`@ext.cache_model("db_schema_snapshot")`** in `app.py` — Pydantic models `DbSchemaSnapshot`, `DbSchemaTable`, `DbSchemaColumn`, plus constants `SCHEMA_CACHE_KEY` and `SCHEMA_CACHE_TTL`.
+- **`load_schema_section(ctx)`** + **`invalidate(ctx)`** in `schema_guard.py` — async accessors over `ctx.cache.get/delete` with `model=DbSchemaSnapshot`. Cold cache returns `{}`; transport / model-mismatch errors are caught and treated as cold.
+- **Column-level guard on `execute_sql`** — INSERT/UPDATE column lists are extracted from the SQL and validated against the cached schema before round-tripping. Recovery hint is appended ("Call get_schema('<table>') and retry") so the LLM has a clear next-tool-use to call.
+- **DDL cache invalidation** — successful `CREATE / DROP / ALTER / TRUNCATE / RENAME` drops the cached snapshot via `invalidate(ctx)`. The next write either sees a fresh skeleton refresh or cold-cache-skips validation, never a stale shape.
+- **`extract_insert_columns` / `extract_update_columns`** in `sql_parser.py` — depth- and quote-aware top-level splitter; conservative on shapes the parser can't isolate (returns `[]` → caller skips).
+- **System prompt — worked examples for column hallucination.** Three BAD / GOOD pairs covering (a) suffix-drop (`category` vs `category_id`), (b) inventing a column on a table the assistant just created, (c) tool-error recovery loop. Plus an explicit rule: after `CREATE TABLE` in the current turn, always `get_schema()` before the first `INSERT` into that table.
+
+### Changed
+
+- **`schema_guard.py`** — public surface refactored from `(ctx, ...)` to `(section: dict, ...)`. Callers load the section once via `await load_schema_section(ctx)`, then run synchronous validators against it. Reduces per-call cache reads in handlers that validate both a table and its columns.
+- **`skeleton.py`** — every successful and partial-failure return path now mirrors its payload to `ctx.cache` via `_mirror_to_cache(ctx, payload)`. Mirror failures are logged at `WARNING` and never break the skeleton refresh itself.
+- **`handlers_rows.py`** — three `validate_table_exists` / `validate_columns` call sites updated to load the section once per handler.
+- **`app.py`** — version bumped to `1.3.3`.
+
+### Why this matters
+
+In production logs from 2026-04-25, `gpt-4.1-mini` running inside `tool_sql_db_chat` issued `INSERT INTO products (name, category, price, stock) VALUES (...)` — but the real schema is `(id, name, category_id, price, stock)`. MariaDB returned `1054 Unknown column 'category'`, the LLM did not engage the SCHEMA-FIRST recovery pattern from the system prompt, and a second hallucinated INSERT into a freshly-created `employees` table with a phantom `department` column failed the same way.
+
+Three structural causes:
+
+1. The existing `schema_guard` reached for `ctx.skeleton_data`, which SDK 1.6.0 removed — it was a silent no-op on the 1.6.2 baseline. Validation that should have caught the unknown column never ran.
+2. `fn_execute_sql` called only `list_known_tables` (table-level) and never invoked `validate_columns` even though the helper existed.
+3. Schema cache had a 300 s TTL with no invalidation on DDL, so a `CREATE TABLE` followed by an immediate `INSERT` against the new table ran against a stale snapshot.
+
+This release closes all three: the cache channel works under 1.6.x's permission model, `execute_sql` now runs both gates, and successful DDL drops the cache so the next refresh repopulates with the new shape.
+
+---
+
 ## [1.3.2] — 2026-04-25
 
 Pin `imperal-sdk==1.6.2` after rolling back the v2.0.0 / SDK v2.0 / Webbee Single Voice rebuild. Code unchanged from 1.3.1; only the SDK constraint moves from `>=1.5.26,<1.6` to the exact runtime version in production. The v2.0 work is preserved on the `sdk-v2-migration` branch (and tagged `pre-1.6.2-rebuild-2026-04-25` on main pre-reset) for incremental re-roll.
