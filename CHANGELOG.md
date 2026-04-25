@@ -6,6 +6,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.3.4] — 2026-04-26
+
+Hotfix on top of 1.3.3 — schema cache mirror was silently failing in production with `I-CACHE-MODEL-REGISTRATION-REQUIRED`, leaving the column-level validator permanently cold.
+
+### Fixed
+
+- **`@ext.cache_model("db_schema_snapshot")` now decorates `DbSchemaSnapshot` directly** instead of an empty subclass `_DbSchemaSnapshotCache`. SDK 1.6.x reverse-lookup in `extension._resolve_cache_model_name` uses class identity (`registered_cls is cls`), not `isinstance`. The 1.3.3 wrapper class registered an object distinct from the one passed at `ctx.cache.set(..., model=DbSchemaSnapshot)` / `ctx.cache.get(..., model=DbSchemaSnapshot)` call sites, so the registry never matched and every mirror attempt fell back to the warning-and-noop path.
+
+### Why this matters
+
+In 1.3.3 production, every skeleton refresh logged `WARNING sql-db — schema cache mirror failed: cache model 'DbSchemaSnapshot' is not registered`. The cache stayed empty, `load_schema_section(ctx)` returned `{}` on every read, both `validate_table_exists` and `validate_columns` short-circuited to `None`, and the column-hallucination guard never fired — `INSERT INTO orders (..., total_amount, ...)` reached the backend and got `1054 Unknown column 'total_amount'` from MariaDB instead of the friendly recovery hint. With the registration fixed, the same INSERT now hits the in-process gate first and the LLM gets `Unknown column(s) for table 'orders': total_amount. Valid columns: ... . Call get_schema('orders') and retry.` — which the `system_prompt.txt` worked example trains it to recover from.
+
+### No code-shape changes
+
+`schema_guard.py`, `skeleton.py`, `handlers_*.py`, `sql_parser.py`, `system_prompt.txt` — all unchanged from 1.3.3. The fix is one decorator move.
+
+---
+
 ## [1.3.3] — 2026-04-26
 
 Fix the 1054 column-hallucination class. Pre-write validation moves off the dead `ctx.skeleton_data` path (gone since SDK 1.6.0) onto the supported `ctx.cache` channel, with the `@ext.skeleton('db_schema')` refresher mirroring its payload to a Pydantic-typed cache entry that `@chat.function` handlers can read.

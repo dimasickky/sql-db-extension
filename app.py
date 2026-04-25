@@ -231,7 +231,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "sql-db",
-    version="1.3.3",
+    version="1.3.4",
     capabilities=["sql-db:read", "sql-db:write"],
 )
 
@@ -273,19 +273,20 @@ class DbSchemaTable(_BM):
     columns: list[DbSchemaColumn] = []
 
 
+@ext.cache_model("db_schema_snapshot")
 class DbSchemaSnapshot(_BM):
     """Mirror of the @ext.skeleton('db_schema') payload, readable from
-    @chat.function handlers via ctx.cache. Shape matches skeleton.py."""
+    @chat.function handlers via ctx.cache. Shape matches skeleton.py.
+
+    Registered directly with @ext.cache_model — SDK 1.6.x reverse-lookup in
+    extension._resolve_cache_model_name uses class identity (`is`), not
+    isinstance, so the *exact* class passed to ctx.cache.set/get must be
+    the one carrying the decorator."""
     database: str = ""
     connection: str = ""
     table_count: int = 0
     tables: list[DbSchemaTable] = []
     note: str = ""
-
-
-@ext.cache_model("db_schema_snapshot")
-class _DbSchemaSnapshotCache(DbSchemaSnapshot):
-    pass
 
 
 # ─── Health Check ─────────────────────────────────────────────────────── #
