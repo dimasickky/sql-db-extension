@@ -22,6 +22,22 @@
       }
     },
     {
+      "name": "skeleton_refresh_db_schema",
+      "description": "Refresh active database schema cache — tables, columns, row counts.",
+      "scopes": ["sql-db:read"],
+      "parameters": {
+        "kwargs": {"type": "string", "required": true}
+      }
+    },
+    {
+      "name": "skeleton_alert_db_schema",
+      "description": "Alert companion for db_schema skeleton — invoked by kernel when alert=True.",
+      "scopes": ["sql-db:read"],
+      "parameters": {
+        "kwargs": {"type": "string", "required": true}
+      }
+    },
+    {
       "name": "__panel__sidebar",
       "description": "Panel: SQL DB",
       "scopes": [],
