@@ -3,9 +3,35 @@ from __future__ import annotations
 
 import logging
 
-from app import ext, _api_post, _user_id, resolve_connection, build_conn_info
+from app import (
+    ext,
+    _api_post,
+    _user_id,
+    resolve_connection,
+    build_conn_info,
+    DbSchemaSnapshot,
+    SCHEMA_CACHE_KEY,
+    SCHEMA_CACHE_TTL,
+)
 
 log = logging.getLogger("sql-db")
+
+
+async def _mirror_to_cache(ctx, payload: dict) -> None:
+    """Mirror the skeleton payload into ctx.cache so @chat.function handlers
+    (which cannot touch ctx.skeleton in 1.6.0+) can read tables/columns for
+    write-time validation. Best-effort — never blocks the skeleton refresh.
+    """
+    try:
+        snap = DbSchemaSnapshot.model_validate(payload)
+        await ctx.cache.set(
+            SCHEMA_CACHE_KEY,
+            snap,
+            ttl_seconds=SCHEMA_CACHE_TTL,
+        )
+    except Exception as exc:
+        # Cache is an advisory side-channel; never break the skeleton on it.
+        log.warning("schema cache mirror failed: %s", exc)
 
 
 # ─── Skeleton ─────────────────────────────────────────────────────────── #
@@ -26,23 +52,27 @@ async def skeleton_refresh_db_schema(ctx, **kwargs) -> dict:
     try:
         conn, conn_id = await resolve_connection(ctx)
         if not conn:
-            return {"response": {
+            payload = {
                 "database": "",
                 "connection": "",
                 "table_count": 0,
                 "tables": [],
                 "note": "No active connection",
-            }}
+            }
+            await _mirror_to_cache(ctx, payload)
+            return {"response": payload}
 
         database = conn.get("database", "")
         if not database:
-            return {"response": {
+            payload = {
                 "database": "",
                 "connection": conn.get("name", ""),
                 "table_count": 0,
                 "tables": [],
                 "note": "No database selected",
-            }}
+            }
+            await _mirror_to_cache(ctx, payload)
+            return {"response": payload}
 
         result = await _api_post(f"/v1/connections/{conn_id}/schema", {
             "user_id": _user_id(ctx),
@@ -65,12 +95,14 @@ async def skeleton_refresh_db_schema(ctx, **kwargs) -> dict:
                 "columns": cols,
             })
 
-        return {"response": {
+        payload = {
             "database":    database,
             "connection":  conn.get("name", ""),
             "table_count": len(compact_tables),
             "tables":      compact_tables,
-        }}
+        }
+        await _mirror_to_cache(ctx, payload)
+        return {"response": payload}
     except Exception as e:
         log.error("Skeleton refresh failed: %s", e)
         return {"response": {

@@ -90,3 +90,143 @@ def extract_target_tables(sql: str) -> list[str]:
         if name and name.upper() not in {"SELECT", "WHERE", "SET", "VALUES"} and name not in seen:
             seen.append(name)
     return seen
+
+
+# ─── Column extractors for write-time guard ───────────────────────────── #
+
+_INSERT_COLS = _re.compile(
+    r"INSERT\s+(?:IGNORE\s+)?INTO\s+`?[A-Za-z_][A-Za-z0-9_]*`?\s*\(([^)]+)\)",
+    _re.IGNORECASE,
+)
+
+_UPDATE_HEAD = _re.compile(
+    r"UPDATE\s+`?[A-Za-z_][A-Za-z0-9_]*`?\s+SET\s+",
+    _re.IGNORECASE,
+)
+
+
+def _find_set_clause(sql: str) -> str | None:
+    """Return the substring between `SET` and the top-level WHERE/ORDER/LIMIT
+    boundary, with paren / quote depth tracked so a nested `WHERE` in a
+    subquery does not terminate the SET clause early."""
+    m = _UPDATE_HEAD.search(sql)
+    if not m:
+        return None
+    start = m.end()
+    depth = 0
+    quote: str | None = None
+    i = start
+    n = len(sql)
+    boundaries = ("WHERE", "ORDER", "LIMIT")
+    while i < n:
+        c = sql[i]
+        if quote:
+            if c == quote:
+                quote = None
+            i += 1
+            continue
+        if c in ("'", '"', "`"):
+            quote = c
+            i += 1
+            continue
+        if c == "(":
+            depth += 1
+            i += 1
+            continue
+        if c == ")":
+            depth -= 1
+            i += 1
+            continue
+        if c == ";":
+            return sql[start:i]
+        if depth == 0 and c.isspace():
+            # check for boundary keyword
+            j = i + 1
+            while j < n and sql[j].isspace():
+                j += 1
+            for kw in boundaries:
+                kl = len(kw)
+                if (
+                    sql[j:j + kl].upper() == kw
+                    and (j + kl == n or not sql[j + kl].isalnum())
+                ):
+                    return sql[start:i]
+            i = j
+            continue
+        i += 1
+    return sql[start:]
+
+
+def _split_top_level(s: str, sep: str = ",") -> list[str]:
+    """Split on `sep` ignoring separators inside (), '', "", or backticks."""
+    out: list[str] = []
+    buf: list[str] = []
+    depth = 0
+    quote: str | None = None
+    for c in s:
+        if quote:
+            buf.append(c)
+            if c == quote:
+                quote = None
+            continue
+        if c in ("'", '"', "`"):
+            quote = c
+            buf.append(c)
+            continue
+        if c == "(":
+            depth += 1
+            buf.append(c)
+            continue
+        if c == ")":
+            depth -= 1
+            buf.append(c)
+            continue
+        if c == sep and depth == 0:
+            out.append("".join(buf).strip())
+            buf = []
+            continue
+        buf.append(c)
+    tail = "".join(buf).strip()
+    if tail:
+        out.append(tail)
+    return out
+
+
+def extract_insert_columns(sql: str) -> list[str]:
+    """Extract column names from `INSERT INTO t (a, b, c) VALUES ...`.
+
+    Returns [] when the column list is omitted (positional INSERT) — caller
+    treats [] as "skip column-level validation" because positional INSERTs
+    rely on table-order and the backend will produce a more useful error.
+    """
+    if not sql:
+        return []
+    m = _INSERT_COLS.search(sql)
+    if not m:
+        return []
+    inner = m.group(1)
+    cols = _split_top_level(inner, ",")
+    return [c.strip().strip("`").strip('"') for c in cols if c.strip()]
+
+
+def extract_update_columns(sql: str) -> list[str]:
+    """Extract LHS column names from `UPDATE t SET a=1, b='x' WHERE ...`.
+
+    Conservative: returns [] when the SET clause cannot be isolated (CTEs,
+    nested subqueries assigning columns, etc.). Caller treats [] as
+    "skip column-level validation".
+    """
+    if not sql:
+        return []
+    inner = _find_set_clause(sql)
+    if not inner:
+        return []
+    pairs = _split_top_level(inner, ",")
+    cols: list[str] = []
+    for p in pairs:
+        if "=" not in p:
+            return []  # malformed — bail to backend
+        lhs = p.split("=", 1)[0].strip().strip("`").strip('"')
+        if lhs:
+            cols.append(lhs)
+    return cols

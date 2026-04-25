@@ -5,8 +5,17 @@ from pydantic import BaseModel, Field
 
 from app import chat, ActionResult, _api_post, require_user_id, build_conn_info
 from handlers_query import _resolve, RunQueryParams, ExplainParams  # noqa: F401
-from schema_guard import list_known_tables
-from sql_parser import extract_target_tables
+from schema_guard import (
+    load_schema_section,
+    list_known_tables,
+    validate_columns,
+    invalidate as invalidate_schema_cache,
+)
+from sql_parser import (
+    extract_target_tables,
+    extract_insert_columns,
+    extract_update_columns,
+)
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -26,6 +35,11 @@ class RunEditorSqlParams(BaseModel):
 # ─── Handler ──────────────────────────────────────────────────────────── #
 
 _WRITE_VERBS_AFFECTING_ROWS = {"INSERT", "UPDATE", "DELETE", "REPLACE"}
+_DDL_VERBS = {"CREATE", "DROP", "ALTER", "TRUNCATE", "RENAME"}
+
+
+def _first_word(sql: str) -> str:
+    return sql.split()[0].upper() if sql else ""
 
 
 @chat.function(
@@ -52,19 +66,43 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
                 "execute_sql: sql parameter is empty"
             )
 
-        # Light schema gate: if skeleton knows a concrete list of tables and
-        # we can extract a single target table that isn't in the list, fail
-        # fast. Subqueries / CTEs / DDL ambiguity → extractor returns [] →
-        # we skip the gate (don't over-reject).
-        known = list_known_tables(ctx)
-        if known:
+        # Schema gate (table + column level). Snapshot is sourced from
+        # ctx.cache (mirrored by skeleton.py); cold cache → all validators
+        # return None → we defer to the backend without rejecting.
+        section = await load_schema_section(ctx)
+        known = list_known_tables(section)
+        verb = _first_word(sql)
+
+        # 1) Table-level: reject obvious typos before round-trip. DDL is
+        #    table-creating, so we DO NOT reject CREATE/ALTER on unknown
+        #    tables — the whole point is they are about to exist.
+        if known and verb not in _DDL_VERBS:
             targets = extract_target_tables(sql)
             missing = [t for t in targets if t not in known]
             if missing:
                 return ActionResult.error(
                     f"Unknown table(s) referenced: {', '.join(missing)}. "
-                    f"Known tables: {', '.join(known)}."
+                    f"Known tables: {', '.join(known)}. "
+                    "Call get_schema() to refresh, then retry."
                 )
+
+        # 2) Column-level for INSERT / UPDATE — closes the 1054 hallucination
+        #    path. Skipped on positional INSERT (no col list) and on shapes
+        #    the parser can't isolate cleanly (extractor returns []).
+        if verb in ("INSERT", "UPDATE") and known:
+            targets = extract_target_tables(sql)
+            if targets:
+                table = targets[0]
+                cols = (
+                    extract_insert_columns(sql) if verb == "INSERT"
+                    else extract_update_columns(sql)
+                )
+                if cols:
+                    if (c_err := validate_columns(section, table, cols)):
+                        return ActionResult.error(
+                            f"{c_err} Call get_schema('{table}') and retry "
+                            "with the correct columns."
+                        )
 
         conn, conn_id = await _resolve(ctx, conn_id_in)
         if not conn:
@@ -94,6 +132,13 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
                 f"{query_type} executed but 0 rows affected — "
                 f"check VALUES list or WHERE clause"
             )
+
+        # DDL changed the schema shape — the cached snapshot is now stale.
+        # Drop it so the next write either sees a fresh skeleton refresh or
+        # cold-cache-skips validation (vs. rejecting on stale columns). The
+        # next @ext.skeleton tick will repopulate cache with the new shape.
+        if query_type in _DDL_VERBS:
+            await invalidate_schema_cache(ctx)
 
         return ActionResult.success(
             data={

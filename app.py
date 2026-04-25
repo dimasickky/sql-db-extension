@@ -231,7 +231,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "sql-db",
-    version="1.3.1",
+    version="1.3.3",
     capabilities=["sql-db:read", "sql-db:write"],
 )
 
@@ -245,6 +245,47 @@ chat = ChatExtension(
     system_prompt=SYSTEM_PROMPT,
     model="claude-haiku-4-5-20251001",
 )
+
+
+# ─── Schema cache (SDK 1.6.x ctx.cache contract) ──────────────────────── #
+#
+# Skeleton is LLM-only in 1.6.0+ (SkeletonAccessForbidden raised from
+# @chat.function). Schema snapshots required by write-time validation flow
+# through ctx.cache instead. The skeleton refresher writes here after every
+# successful refresh; @chat.function handlers read from here to validate
+# tables/columns before round-tripping a doomed INSERT/UPDATE to the backend.
+
+from pydantic import BaseModel as _BM
+
+SCHEMA_CACHE_KEY = "schema:active"
+SCHEMA_CACHE_TTL = 300  # matches @ext.skeleton(ttl=300); SDK cap is 300s.
+
+
+class DbSchemaColumn(_BM):
+    name: str
+    type: str = ""
+    key: str = ""
+
+
+class DbSchemaTable(_BM):
+    name: str
+    rows: int = 0
+    columns: list[DbSchemaColumn] = []
+
+
+class DbSchemaSnapshot(_BM):
+    """Mirror of the @ext.skeleton('db_schema') payload, readable from
+    @chat.function handlers via ctx.cache. Shape matches skeleton.py."""
+    database: str = ""
+    connection: str = ""
+    table_count: int = 0
+    tables: list[DbSchemaTable] = []
+    note: str = ""
+
+
+@ext.cache_model("db_schema_snapshot")
+class _DbSchemaSnapshotCache(DbSchemaSnapshot):
+    pass
 
 
 # ─── Health Check ─────────────────────────────────────────────────────── #
