@@ -1,1 +1,1 @@
-imperal-sdk>=1.5.26,<1.6
+imperal-sdk==1.6.2
