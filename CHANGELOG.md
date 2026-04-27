@@ -6,6 +6,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.4.0] — 2026-04-27
+
+SDK migration: `imperal-sdk==2.0.1` → `imperal-sdk==3.0.0` (Identity Contract Unification, W1).
+
+### Why
+
+SDK 3.0.0 deletes `imperal_sdk.auth.user.User`, makes `User`/`UserContext` frozen Pydantic v2 models with `extra="forbid"`, and renames `.id` → `.imperal_id` on user objects. `ctx.user.id` raises `AttributeError` on 3.x with no alias. Production worker venv was upgraded to 3.0.0 — any 2.x-pinned extension breaks on identity reads.
+
+### Changed
+
+- **`app.py`** — `_user_id(ctx)` reads `ctx.user.imperal_id` instead of `ctx.user.id`. `require_user_id` docstring updated.
+- **`requirements.txt`** — `imperal-sdk==2.0.1` → `imperal-sdk==3.0.0`. Equality pin retained as the workspace invariant.
+
+### Not changed
+
+- All other Python source, manifest, system_prompt, panels, handlers — byte-for-byte identical to 1.3.5.
+
+---
+
 ## [1.3.5] — 2026-04-26
 
 Pin bump only: `imperal-sdk==1.6.2` → `imperal-sdk==2.0.1`. No source changes.

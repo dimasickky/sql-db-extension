@@ -98,11 +98,11 @@ def _user_id(ctx) -> str:
     empty ctx fails loudly rather than silently scoping every backend
     query to no-user.
     """
-    return ctx.user.id if hasattr(ctx, "user") and ctx.user else ""
+    return ctx.user.imperal_id if hasattr(ctx, "user") and ctx.user else ""
 
 
 def require_user_id(ctx) -> str:
-    """Return ctx.user.id or raise. Use from every @chat.function handler.
+    """Return ctx.user.imperal_id or raise. Use from every @chat.function handler.
 
     When a chain step arrives without ctx.user populated (kernel-side bug
     class observed 2026-04-23), a silent "" would scope every backend
@@ -231,7 +231,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "sql-db",
-    version="1.3.5",
+    version="1.4.0",
     capabilities=["sql-db:read", "sql-db:write"],
 )
 
