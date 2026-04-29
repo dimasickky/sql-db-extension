@@ -1,7 +1,7 @@
 """sql-db · Query, explain, dry_run handlers."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import (
     chat, ActionResult, _api_post, require_user_id,
@@ -10,30 +10,59 @@ from app import (
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
+# LLM-input models — see handlers_connections.py for the AliasChoices rationale.
+
+_SQL_ALIASES = AliasChoices("sql", "query", "statement", "sql_text", "text")
+_CONN_ALIASES = AliasChoices("connection_id", "conn_id", "connection")
+_DB_ALIASES = AliasChoices("database", "db", "db_name", "database_name", "schema")
+
 
 class RunQueryParams(BaseModel):
     """Run a SELECT query."""
-    sql: str = Field(description="SQL SELECT query")
+    model_config = ConfigDict(populate_by_name=True)
+
+    sql: str = Field(validation_alias=_SQL_ALIASES, description="SQL SELECT query")
     limit: int = Field(default=100, description="Max rows to return")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 class ExplainParams(BaseModel):
     """Explain a query."""
-    sql: str = Field(description="SQL query to explain")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    sql: str = Field(validation_alias=_SQL_ALIASES, description="SQL query to explain")
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 class DryRunParams(BaseModel):
     """Dry-run a DML statement."""
-    sql: str = Field(description="DML statement to dry-run")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    sql: str = Field(validation_alias=_SQL_ALIASES, description="DML statement to dry-run")
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 class GetSchemaParams(BaseModel):
     """Get database schema."""
-    database: str = Field(default="", description="Database name (empty = default)")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    database: str = Field(
+        default="", validation_alias=_DB_ALIASES,
+        description="Database name (empty = default)",
+    )
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────── #

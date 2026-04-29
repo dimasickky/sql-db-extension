@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json as _json
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import chat, ActionResult, _api_post, require_user_id, build_conn_info
 from handlers_query import _resolve as _query_resolve
@@ -47,28 +47,63 @@ async def fn_pulse_sql_executed(ctx, params: PulseParams) -> ActionResult:
 
 # ─── Models ───────────────────────────────────────────────────────────── #
 
+# LLM-input — see handlers_connections.py for AliasChoices rationale.
+_TABLE_ALIASES = AliasChoices("table", "table_name", "tbl", "tablename")
+_VALUES_ALIASES = AliasChoices("values_json", "values", "data", "row", "fields")
+_PK_COL_ALIASES = AliasChoices("pk_col", "pk_column", "primary_key", "key_column", "pk")
+_PK_VAL_ALIASES = AliasChoices("pk_value", "key_value", "pk_val", "id_value", "value")
+_CONN_ALIASES = AliasChoices("connection_id", "conn_id", "connection")
+
+
 class InsertRowParams(BaseModel):
     """Insert a new row into a table."""
-    table: str = Field(description="Table name")
-    values_json: str = Field(description="JSON object of column -> value to insert")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    table: str = Field(validation_alias=_TABLE_ALIASES, description="Table name")
+    values_json: str = Field(
+        validation_alias=_VALUES_ALIASES,
+        description="JSON object of column -> value to insert",
+    )
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 class UpdateRowParams(BaseModel):
     """Update a single row by primary key."""
-    table: str = Field(description="Table name")
-    pk_col: str = Field(description="Primary key column name")
-    pk_value: str = Field(description="Primary key value of the row to update")
-    values_json: str = Field(description="JSON object of column -> new value")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    table: str = Field(validation_alias=_TABLE_ALIASES, description="Table name")
+    pk_col: str = Field(validation_alias=_PK_COL_ALIASES, description="Primary key column name")
+    pk_value: str = Field(
+        validation_alias=_PK_VAL_ALIASES,
+        description="Primary key value of the row to update",
+    )
+    values_json: str = Field(
+        validation_alias=_VALUES_ALIASES,
+        description="JSON object of column -> new value",
+    )
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 class DeleteRowParams(BaseModel):
     """Delete a single row by primary key."""
-    table: str = Field(description="Table name")
-    pk_col: str = Field(description="Primary key column name")
-    pk_value: str = Field(description="Primary key value of the row to delete")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    table: str = Field(validation_alias=_TABLE_ALIASES, description="Table name")
+    pk_col: str = Field(validation_alias=_PK_COL_ALIASES, description="Primary key column name")
+    pk_value: str = Field(
+        validation_alias=_PK_VAL_ALIASES,
+        description="Primary key value of the row to delete",
+    )
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────── #

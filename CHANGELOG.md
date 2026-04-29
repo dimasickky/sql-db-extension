@@ -6,6 +6,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.4.1] — 2026-04-29
+
+LLM tool-input robustness: every `@chat.function` params model now accepts the synonyms an LLM is most likely to emit, so a user request like “Username: X, server: Y, db: Z” no longer trips `VALIDATION_MISSING_FIELD` from raw Pydantic into chat.
+
+### Why
+
+`AddConnectionParams` declared canonical names `db_user` / `host` / `database` only. Sonnet/Haiku tool-use generation often picks `username` / `server` / `db` instead, and the missing-field error leaked unwrapped into the chat (against the Dimasickky enterprise quality bar — no internal error should reach the user). Same risk existed across every other LLM-input model in the extension.
+
+### Changed
+
+- **`handlers_connections.py`** — `AddConnectionParams`, `UpdateConnectionParams`, `ConnectionIdParams`, `SelectConnectionParams`, `ResolveConnByDbParams`: `validation_alias=AliasChoices(...)` on every LLM-facing field, `model_config = ConfigDict(populate_by_name=True)`. `name` made optional with derive-on-empty fallback (`<host_short>_<db_or_user>`).
+- **`handlers_query.py`** — `RunQueryParams`, `ExplainParams`, `DryRunParams`, `GetSchemaParams`: aliases on `sql`, `connection_id`, `database`.
+- **`handlers_execute.py`** — `ExecuteSqlParams`, `RunEditorSqlParams`: aliases on `sql`, `connection_id`.
+- **`handlers_rows.py`** — `InsertRowParams`, `UpdateRowParams`, `DeleteRowParams`: aliases on `table`, `values_json`, `pk_col`, `pk_value`, `connection_id`.
+- **`handlers_history.py`** — `ListHistoryParams`, `SaveQueryParams`, `ListSavedParams`, `RunSavedParams`, `DeleteSavedParams`: aliases on `connection_id`, `query_id`, `sql_text`, `name`, `description`.
+- **`handlers_nlq.py`** — `NlToSqlParams`: aliases on `question`, `connection_id`.
+- **`imperal.json`**, **`app.py`** — version bump 1.4.0 → 1.4.1.
+
+### Architecture note
+
+`AliasChoices` is applied **only** to LLM-input models (those bound to `@chat.function` params). Internal models (`PulseParams`), wire contracts to `the backend:8099`, and storage payloads remain strict — the LLM-tolerance is contained at the chat boundary.
+
+### Not changed
+
+- SDK pin (`imperal-sdk==3.0.0`), backend wire contract, manifest tools list, panels, system_prompt, identity reads.
+
+---
+
 ## [1.4.0] — 2026-04-27
 
 SDK migration: `imperal-sdk==2.0.1` → `imperal-sdk==3.0.0` (Identity Contract Unification, W1).

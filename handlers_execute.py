@@ -1,7 +1,7 @@
 """sql-db · DML/DDL execution handler + universal editor runner."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import chat, ActionResult, _api_post, require_user_id, build_conn_info
 from handlers_query import _resolve, RunQueryParams, ExplainParams  # noqa: F401
@@ -19,17 +19,35 @@ from sql_parser import (
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
+# LLM-input — see handlers_connections.py for AliasChoices rationale.
+
+_SQL_ALIASES = AliasChoices("sql", "query", "statement", "sql_text", "text")
+_CONN_ALIASES = AliasChoices("connection_id", "conn_id", "connection")
+
 
 class ExecuteSqlParams(BaseModel):
     """Execute a DML/DDL statement."""
-    sql: str = Field(description="SQL statement (INSERT/UPDATE/DELETE/ALTER/CREATE/DROP)")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    sql: str = Field(
+        validation_alias=_SQL_ALIASES,
+        description="SQL statement (INSERT/UPDATE/DELETE/ALTER/CREATE/DROP)",
+    )
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 class RunEditorSqlParams(BaseModel):
     """Run any SQL from the editor — auto-detects type."""
-    sql: str = Field(description="SQL statement")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    sql: str = Field(validation_alias=_SQL_ALIASES, description="SQL statement")
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 # ─── Handler ──────────────────────────────────────────────────────────── #
