@@ -1,7 +1,7 @@
 """sql-db · Connection CRUD handlers."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import (
     chat, ActionResult, _api_post, require_user_id, _tenant_id,
@@ -11,42 +11,111 @@ from app import (
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
+#
+# LLM-input models accept synonyms for each field via AliasChoices: an
+# LLM tool_use that says "username" / "server" / "db" lands on the
+# canonical field instead of raising VALIDATION_MISSING_FIELD into chat.
+# Internal canonical names below are unchanged — fn_* handlers keep using
+# params.db_user / params.host / params.database.
 
 class AddConnectionParams(BaseModel):
     """Add a new database connection."""
-    name: str = Field(description="Connection name (e.g. 'production', 'staging')")
-    host: str = Field(description="MySQL host")
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(
+        default="",
+        validation_alias=AliasChoices("name", "connection_name", "conn_name", "label"),
+        description=(
+            "Short connection label (e.g. 'whmcs', 'production'). "
+            "Optional — derived from host+database when empty."
+        ),
+    )
+    host: str = Field(
+        validation_alias=AliasChoices("host", "server", "hostname", "address"),
+        description="MySQL host (e.g. server8.webhostmost.com)",
+    )
     port: int = Field(default=3306, description="MySQL port")
-    db_user: str = Field(description="MySQL username")
-    password: str = Field(description="MySQL password (will be encrypted)")
-    database: str = Field(default="", description="Default database name")
+    db_user: str = Field(
+        validation_alias=AliasChoices("db_user", "user", "username", "login"),
+        description="MySQL username",
+    )
+    password: str = Field(
+        validation_alias=AliasChoices("password", "pass", "pwd"),
+        description="MySQL password (will be encrypted)",
+    )
+    database: str = Field(
+        default="",
+        validation_alias=AliasChoices("database", "db", "db_name", "database_name", "schema"),
+        description="Default database name",
+    )
 
 
 class ConnectionIdParams(BaseModel):
     """Target a specific connection."""
-    connection_id: str = Field(description="Connection ID")
+    model_config = ConfigDict(populate_by_name=True)
+
+    connection_id: str = Field(
+        validation_alias=AliasChoices("connection_id", "conn_id", "connection", "id"),
+        description="Connection ID",
+    )
 
 
 class UpdateConnectionParams(BaseModel):
     """Update connection details."""
-    connection_id: str = Field(description="Connection ID")
-    name: str = Field(default="", description="New name")
-    host: str = Field(default="", description="New host")
+    model_config = ConfigDict(populate_by_name=True)
+
+    connection_id: str = Field(
+        validation_alias=AliasChoices("connection_id", "conn_id", "connection", "id"),
+        description="Connection ID",
+    )
+    name: str = Field(
+        default="",
+        validation_alias=AliasChoices("name", "connection_name", "conn_name", "label"),
+        description="New name",
+    )
+    host: str = Field(
+        default="",
+        validation_alias=AliasChoices("host", "server", "hostname", "address"),
+        description="New host",
+    )
     port: int = Field(default=0, description="New port (0 = no change)")
-    db_user: str = Field(default="", description="New MySQL username")
-    password: str = Field(default="", description="New password (will be encrypted)")
-    database: str = Field(default="", description="New default database")
+    db_user: str = Field(
+        default="",
+        validation_alias=AliasChoices("db_user", "user", "username", "login"),
+        description="New MySQL username",
+    )
+    password: str = Field(
+        default="",
+        validation_alias=AliasChoices("password", "pass", "pwd"),
+        description="New password (will be encrypted)",
+    )
+    database: str = Field(
+        default="",
+        validation_alias=AliasChoices("database", "db", "db_name", "database_name", "schema"),
+        description="New default database",
+    )
 
 
 class SelectConnectionParams(BaseModel):
     """Switch active connection."""
-    connection_id: str = Field(description="Connection ID to activate")
+    model_config = ConfigDict(populate_by_name=True)
+
+    connection_id: str = Field(
+        validation_alias=AliasChoices("connection_id", "conn_id", "connection", "id"),
+        description="Connection ID to activate",
+    )
 
 
 class ResolveConnByDbParams(BaseModel):
     """Resolve a connection by database or connection name."""
+    model_config = ConfigDict(populate_by_name=True)
+
     database_name: str = Field(
-        description="Database name (e.g. 'ijodghbk_test') or connection name"
+        validation_alias=AliasChoices(
+            "database_name", "database", "db", "db_name",
+            "name", "connection_name", "label",
+        ),
+        description="Database name (e.g. 'ijodghbk_test') or connection name",
     )
 
 
@@ -60,6 +129,14 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
     """Add a new MySQL/MariaDB connection. Tests before saving."""
     uid = require_user_id(ctx)
     try:
+        # Derive a label when the LLM didn't provide one (user said
+        # "подключи базу X" without naming the connection itself).
+        name = params.name.strip()
+        if not name:
+            host_short = params.host.split(".", 1)[0] if params.host else "conn"
+            tail = params.database or params.db_user or ""
+            name = f"{host_short}_{tail}".rstrip("_") or host_short
+
         pwd_enc = encrypt_password(params.password)
         conn_info = {
             "host": params.host,
@@ -87,7 +164,7 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
         doc = await ctx.store.create(CONN_COLLECTION, {
             "user_id": uid,
             "tenant_id": _tenant_id(ctx),
-            "name": params.name,
+            "name": name,
             "host": params.host,
             "port": params.port,
             "db_user": params.db_user,
@@ -101,7 +178,7 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
         return ActionResult.success(
             data={
                 "connection_id": doc.id,
-                "name": params.name,
+                "name": name,
                 "version": result.get("version", ""),
                 "databases": result.get("databases", []),
             },

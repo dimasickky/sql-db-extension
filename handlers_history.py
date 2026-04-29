@@ -1,43 +1,79 @@
 """sql-db · History & saved queries handlers."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import chat, ActionResult, _api_get, _api_post, _api_delete, _api_patch, require_user_id, build_conn_info
 from handlers_query import _resolve
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
+# LLM-input — see handlers_connections.py for AliasChoices rationale.
+
+_CONN_ALIASES = AliasChoices("connection_id", "conn_id", "connection")
+_QUERY_ID_ALIASES = AliasChoices("query_id", "id", "qid", "saved_id", "saved_query_id")
+_SQL_TEXT_ALIASES = AliasChoices("sql_text", "sql", "query", "statement", "text")
+_NAME_ALIASES = AliasChoices("name", "title", "label", "query_name")
+
 
 class ListHistoryParams(BaseModel):
     """List query history."""
+    model_config = ConfigDict(populate_by_name=True)
+
     limit: int = Field(default=20, description="Max entries")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 class SaveQueryParams(BaseModel):
     """Save a query."""
-    name: str = Field(description="Query name")
-    sql_text: str = Field(description="SQL text")
-    description: str = Field(default="", description="Optional description")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(validation_alias=_NAME_ALIASES, description="Query name")
+    sql_text: str = Field(validation_alias=_SQL_TEXT_ALIASES, description="SQL text")
+    description: str = Field(
+        default="",
+        validation_alias=AliasChoices("description", "desc", "note", "comment"),
+        description="Optional description",
+    )
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 class ListSavedParams(BaseModel):
     """List saved queries."""
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 class RunSavedParams(BaseModel):
     """Run a saved query."""
-    query_id: str = Field(description="Saved query ID")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    query_id: str = Field(validation_alias=_QUERY_ID_ALIASES, description="Saved query ID")
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 class DeleteSavedParams(BaseModel):
     """Delete a saved query."""
-    query_id: str = Field(description="Saved query ID")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    query_id: str = Field(validation_alias=_QUERY_ID_ALIASES, description="Saved query ID")
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
 
 
 # ─── Handlers ─────────────────────────────────────────────────────────── #

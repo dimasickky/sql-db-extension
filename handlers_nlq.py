@@ -1,18 +1,28 @@
 """sql-db · Natural language to SQL handler."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import chat, ActionResult, _api_post, require_user_id, get_active_connection, build_conn_info
 from handlers_query import _resolve
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
+# LLM-input — see handlers_connections.py for AliasChoices rationale.
 
 class NlToSqlParams(BaseModel):
     """Convert natural language question to SQL."""
-    question: str = Field(description="Natural language question about the data")
-    connection_id: str = Field(default="", description="Connection ID (empty = active)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    question: str = Field(
+        validation_alias=AliasChoices("question", "query", "prompt", "text", "q", "ask"),
+        description="Natural language question about the data",
+    )
+    connection_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("connection_id", "conn_id", "connection"),
+        description="Connection ID (empty = active)",
+    )
 
 
 # ─── Handler ──────────────────────────────────────────────────────────── #
