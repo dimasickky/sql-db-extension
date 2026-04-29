@@ -9,7 +9,7 @@ for _m in [k for k in sys.modules if k in (
     "handlers_nlq", "handlers_history", "handlers_rows",
     "skeleton", "panels", "panels_editor",
     "panels_editor_results", "panels_editor_tabs", "panels_editor_row_form",
-    "sql_parser",
+    "sql_parser", "events",
 )]:
     del sys.modules[_m]
 
@@ -24,3 +24,4 @@ import handlers_rows           # noqa: F401  # row CRUD (insert/update/delete)
 import skeleton                # noqa: F401
 import panels                  # noqa: F401
 import panels_editor           # noqa: F401  # center overlay SQL editor
+import events                  # noqa: F401  # @ext.on_event sidebar liveness
