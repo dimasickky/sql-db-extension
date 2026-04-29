@@ -335,9 +335,14 @@ async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionRes
 )
 async def fn_delete_connection(ctx, params: ConnectionIdParams) -> ActionResult:
     """Delete a saved connection."""
+    uid = require_user_id(ctx)
     try:
         conn = await get_connection_by_id(ctx, params.connection_id)
         if not conn:
+            return ActionResult.error("Connection not found")
+        # Ownership check: prevent deletion of another user's connection
+        # if get_connection_by_id ever broadens its scope.
+        if conn.get("user_id") and conn.get("user_id") != uid:
             return ActionResult.error("Connection not found")
 
         await ctx.store.delete(CONN_COLLECTION, params.connection_id)

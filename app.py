@@ -173,8 +173,8 @@ async def resolve_connection(ctx) -> tuple[dict | None, str]:
         )
         if page.data:
             return page.data[0].data, page.data[0].id
-    except Exception:
-        pass
+    except Exception as exc:
+        log.warning("resolve_connection: active-flag query failed for user=%s: %s", uid, exc)
 
     # Fallback: any connection for this user. Logged so support can trace
     # surprising "wrong database" UX when a user has prod+staging saved
@@ -192,8 +192,8 @@ async def resolve_connection(ctx) -> tuple[dict | None, str]:
                 uid, conn.get("name", "?"), page.data[0].id,
             )
             return conn, page.data[0].id
-    except Exception:
-        pass
+    except Exception as exc:
+        log.warning("resolve_connection: fallback query failed for user=%s: %s", uid, exc)
 
     return None, ""
 
@@ -231,10 +231,12 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "sql-db",
-    version="1.4.1",
+    version="1.4.2",
     capabilities=["sql-db:read", "sql-db:write"],
 )
 
+# SDK 3.3+ — `model=` deprecated; LLM resolution moved to kernel ctx-injection
+# (see ctx._llm_configs). Will be hard-removed in SDK 4.0.
 chat = ChatExtension(
     ext=ext,
     tool_name="tool_sql_db_chat",
@@ -243,7 +245,6 @@ chat = ChatExtension(
         "browse schema, run queries, explain plans, manage saved queries"
     ),
     system_prompt=SYSTEM_PROMPT,
-    model="claude-haiku-4-5-20251001",
 )
 
 

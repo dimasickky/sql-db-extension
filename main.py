@@ -1,4 +1,4 @@
-"""sql-db v1.2.1 · pagination + sidebar-refresh pulse on panel DML."""
+"""sql-db · entrypoint."""
 from __future__ import annotations
 
 import sys, os

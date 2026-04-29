@@ -6,6 +6,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.4.2] — 2026-04-29
+
+Architecture audit pass: P0/P1 findings on top of the 1.4.1 LLM-input hardening.
+
+### Fixed (P0)
+
+- **`handlers_execute.py`** — `fn_run_editor_sql` body now wrapped in `try/except → ActionResult.error`. Previously any `httpx.ConnectError` / `KeyError` / unexpected backend payload from `_resolve` / `build_conn_info` propagated as an unhandled exception (every other handler in the file already had the wrapper).
+- **`handlers_nlq.py`** — `fn_nl_to_sql` no longer calls `ctx.skeleton.get("db_schema")` from a chat-typed tool. SDK raises `SkeletonAccessForbidden` when `ctx.skeleton.get` is invoked outside an `@ext.skeleton` tool, so the path was effectively dead and always fell through to a fresh `/schema` round-trip. Replaced with `load_schema_section(ctx)` (cache-backed, same source the skeleton refresher writes to). One round-trip saved on every `nl_to_sql` call when schema is warm.
+
+### Fixed (P1)
+
+- **`handlers_connections.py`** — `fn_delete_connection` now calls `require_user_id(ctx)` and verifies `conn.user_id == uid` before delete. Previously the only ownership filter relied on `get_connection_by_id`'s scope; tightened in case that helper ever broadens.
+- **`handlers_execute.py`** — `fn_run_editor_sql` status check standardised to `!= "ok"` (was `== "error"`). A backend reply like `{"status": "degraded", ...}` or one missing `status` would have been silently treated as success.
+
+### Fixed (P2)
+
+- **`app.py`** — bare `except: pass` in `resolve_connection` replaced with `log.warning(..., exc)` on both the active-flag query and the fallback query, per Dimasickky enterprise quality bar.
+- **`app.py`** — `ChatExtension(model="claude-haiku-4-5-20251001")` removed (deprecated since SDK 3.3.0). LLM model resolution is now kernel ctx-injection (`ctx._llm_configs`); the param will hard-error in SDK 4.0.
+- **`main.py`** — stale module docstring `"sql-db v1.2.1 · …"` replaced with `"sql-db · entrypoint."` so version is sourced from one place (`Extension(version=…)`).
+
+### Compatibility
+
+- SDK pin unchanged (`imperal-sdk==3.0.0`). 3.4.0 panel-slot validator (`slot="main"` → ValueError) does not affect this extension — both panels (`panels.py` sidebar `slot="left"`, `panels_editor.py` editor `slot="center"`) use explicit slot values that match the new whitelist.
+- Wire contract with `the backend:8099` unchanged.
+
+---
+
 ## [1.4.1] — 2026-04-29
 
 LLM tool-input robustness: every `@chat.function` params model now accepts the synonyms an LLM is most likely to emit, so a user request like “Username: X, server: Y, db: Z” no longer trips `VALIDATION_MISSING_FIELD` from raw Pydantic into chat.

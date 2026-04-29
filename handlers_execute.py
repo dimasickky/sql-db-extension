@@ -177,68 +177,70 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
 )
 async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
     """Universal SQL runner for the editor panel."""
-    sql = params.sql.strip().rstrip(";")
-    if not sql:
-        return ActionResult.error("Empty SQL")
+    try:
+        sql = params.sql.strip().rstrip(";")
+        if not sql:
+            return ActionResult.error("Empty SQL")
 
-    first_word = sql.split()[0].upper()
-    is_read = first_word in ("SELECT", "SHOW", "DESCRIBE", "DESC", "EXPLAIN")
+        first_word = sql.split()[0].upper()
+        is_read = first_word in ("SELECT", "SHOW", "DESCRIBE", "DESC", "EXPLAIN")
 
-    conn, conn_id = await _resolve(ctx, params.connection_id)
-    if not conn:
-        return ActionResult.error("No active connection.")
+        conn, conn_id = await _resolve(ctx, params.connection_id)
+        if not conn:
+            return ActionResult.error("No active connection.")
 
-    if first_word == "EXPLAIN":
-        # Strip EXPLAIN prefix and run explain
-        inner_sql = sql[len("EXPLAIN"):].strip()
-        if not inner_sql:
-            return ActionResult.error("EXPLAIN requires a query after it.")
-        result = await _api_post(f"/v1/connections/{conn_id}/explain", {
-            "user_id": require_user_id(ctx),
-            "sql": inner_sql,
-            "connection": build_conn_info(conn),
-        })
-        if result.get("status") == "error":
-            return ActionResult.error(result.get("detail", "EXPLAIN failed"))
-        return ActionResult.success(
-            data={"plan": result.get("plan", []), "sql": inner_sql},
-            summary="EXPLAIN plan",
-        )
+        if first_word == "EXPLAIN":
+            inner_sql = sql[len("EXPLAIN"):].strip()
+            if not inner_sql:
+                return ActionResult.error("EXPLAIN requires a query after it.")
+            result = await _api_post(f"/v1/connections/{conn_id}/explain", {
+                "user_id": require_user_id(ctx),
+                "sql": inner_sql,
+                "connection": build_conn_info(conn),
+            })
+            if result.get("status") != "ok":
+                return ActionResult.error(result.get("detail", "EXPLAIN failed"))
+            return ActionResult.success(
+                data={"plan": result.get("plan", []), "sql": inner_sql},
+                summary="EXPLAIN plan",
+            )
 
-    if is_read:
-        result = await _api_post(f"/v1/connections/{conn_id}/query", {
+        if is_read:
+            result = await _api_post(f"/v1/connections/{conn_id}/query", {
+                "user_id": require_user_id(ctx),
+                "sql": sql,
+                "limit": 100,
+                "connection": build_conn_info(conn),
+            })
+            if result.get("status") != "ok":
+                return ActionResult.error(result.get("detail", "Query failed"))
+            return ActionResult.success(
+                data={
+                    "columns": result.get("columns", []),
+                    "rows": result.get("rows", []),
+                    "total_rows": result.get("total_rows", 0),
+                    "exec_ms": result.get("exec_ms", 0),
+                },
+                summary=f"{result.get('total_rows', 0)} row(s) in {result.get('exec_ms', 0)}ms",
+            )
+
+        # DML/DDL
+        result = await _api_post(f"/v1/connections/{conn_id}/execute", {
             "user_id": require_user_id(ctx),
             "sql": sql,
-            "limit": 100,
+            "confirmed": True,
             "connection": build_conn_info(conn),
         })
-        if result.get("status") == "error":
-            return ActionResult.error(result.get("detail", "Query failed"))
+        if result.get("status") != "ok":
+            return ActionResult.error(result.get("detail", "Execution failed"))
         return ActionResult.success(
             data={
-                "columns": result.get("columns", []),
-                "rows": result.get("rows", []),
-                "total_rows": result.get("total_rows", 0),
+                "rows_affected": result.get("rows_affected", 0),
+                "query_type": result.get("query_type", first_word),
+                "tables": result.get("tables", []),
                 "exec_ms": result.get("exec_ms", 0),
             },
-            summary=f"{result.get('total_rows', 0)} row(s) in {result.get('exec_ms', 0)}ms",
+            summary=f"{first_word} — {result.get('rows_affected', 0)} row(s) affected",
         )
-
-    # DML/DDL
-    result = await _api_post(f"/v1/connections/{conn_id}/execute", {
-        "user_id": require_user_id(ctx),
-        "sql": sql,
-        "confirmed": True,
-        "connection": build_conn_info(conn),
-    })
-    if result.get("status") == "error":
-        return ActionResult.error(result.get("detail", "Execution failed"))
-    return ActionResult.success(
-        data={
-            "rows_affected": result.get("rows_affected", 0),
-            "query_type": result.get("query_type", first_word),
-            "tables": result.get("tables", []),
-            "exec_ms": result.get("exec_ms", 0),
-        },
-        summary=f"{first_word} — {result.get('rows_affected', 0)} row(s) affected",
-    )
+    except Exception as e:
+        return ActionResult.error(str(e))

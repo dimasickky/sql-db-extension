@@ -42,10 +42,10 @@ async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
         if not database:
             return ActionResult.error("No database selected.")
 
-        # Get schema from skeleton (cached) or fetch fresh
-        schema_data = None
-        if ctx.skeleton:
-            schema_data = await ctx.skeleton.get("db_schema")
+        # Get schema from cache (populated by @ext.skeleton refresh tick).
+        # ctx.skeleton.get() raises SkeletonAccessForbidden outside a
+        # skeleton-typed tool, so we use the cache layer directly instead.
+        schema_data = await load_schema_section(ctx)
 
         if not schema_data or not schema_data.get("tables"):
             # Fetch fresh schema
