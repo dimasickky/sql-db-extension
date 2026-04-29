@@ -155,6 +155,67 @@ async def _api_patch(path: str, params: dict, data: dict) -> dict:
     return _safe_json(r)
 
 
+# ─── Tiered schema HTTP helpers (Phase 2 — sql-db-scale) ──────────────── #
+#
+# Thin wrappers over the four tiers exposed by the backend routes_schema_v2:
+#   T0 catalog      — list of databases on the connection
+#   T1 tables page  — paginated table list for one database (no columns)
+#   T2 table detail — columns + indexes + foreign keys for one table
+#   T3 exact count  — explicit SELECT COUNT(*); user-action only
+#
+# All four tiers run with a 5s statement timeout on the target DB session
+# (T3 raises this to 30s) so a sick target cannot stall the worker.
+
+async def _api_catalog(ctx, conn: dict, conn_id: str) -> dict:
+    """T0 — list of databases on this connection."""
+    return await _api_post(f"/v1/connections/{conn_id}/catalog", {
+        "user_id": _user_id(ctx),
+        "connection": build_conn_info(conn),
+    })
+
+
+async def _api_tables_page(
+    ctx, conn: dict, conn_id: str, database: str,
+    *, search: str = "", offset: int = 0, limit: int = 200,
+) -> dict:
+    """T1 — paginated table list for one database."""
+    return await _api_post(
+        f"/v1/connections/{conn_id}/tables"
+        f"?search={search}&offset={offset}&limit={limit}",
+        {
+            "user_id": _user_id(ctx),
+            "database": database,
+            "connection": build_conn_info(conn),
+        },
+    )
+
+
+async def _api_table_detail(
+    ctx, conn: dict, conn_id: str, database: str, table: str,
+) -> dict:
+    """T2 — columns + indexes + foreign keys for one table."""
+    return await _api_post(
+        f"/v1/connections/{conn_id}/tables/{table}/detail", {
+            "user_id": _user_id(ctx),
+            "database": database,
+            "connection": build_conn_info(conn),
+        },
+    )
+
+
+async def _api_exact_count(
+    ctx, conn: dict, conn_id: str, database: str, table: str,
+) -> dict:
+    """T3 — real SELECT COUNT(*) for one table. Explicit user action."""
+    return await _api_post(
+        f"/v1/connections/{conn_id}/tables/{table}/count", {
+            "user_id": _user_id(ctx),
+            "database": database,
+            "connection": build_conn_info(conn),
+        },
+    )
+
+
 # ─── Connection helpers ───────────────────────────────────────────────── #
 
 async def resolve_connection(ctx) -> tuple[dict | None, str]:
@@ -231,7 +292,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "sql-db",
-    version="1.4.2",
+    version="1.5.0",
     capabilities=["sql-db:read", "sql-db:write"],
 )
 

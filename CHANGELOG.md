@@ -6,6 +6,108 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.5.0] — 2026-04-30 — sql-db-scale Phase 2 (sidebar liveness foundation)
+
+Sidebar render time is now O(1) in target-DB size. The previous render path
+synchronously fetched the full schema from the backend inside the panel
+decorator on every event — a 10–30 s freeze on a a customer database-snapshot (hundreds
+of tables, multi-million-row activity logs). Phase 2 moves all schema data
+behind a typed cache, splits the event taxonomy DDL-vs-DML, and introduces
+optimistic-UI patching so a successful editor `INSERT`/`UPDATE`/`DELETE`
+updates the sidebar without any HTTP round-trip.
+
+Backend prerequisite (already deployed): the backend v1.3.0 with the four
+new schema tiers (T0 catalog / T1 tables-page / T2 table-detail / T3
+exact-count). Legacy `/v1/connections/{id}/schema` remains mounted as a
+compat shim and no longer runs a `SELECT COUNT(*)` per table — it now
+composes T0+T1 internally and returns row estimates from
+`information_schema.TABLES.TABLE_ROWS`.
+
+Architecture spec: `Dimasickky-Extensions/extensions/sql-db-scale.md`.
+
+### Added
+
+- **`events.py`** — three `@ext.on_event` handlers driving sidebar
+  liveness. `schema.refresh.requested` populates `CatalogCache` +
+  `TablesPageCache` via T0+T1 off the panel render path, then emits
+  `schema.indexed` to re-render. `sql.ddl_executed` invalidates catalog +
+  first-page caches and re-fires `schema.refresh.requested`.
+  `table.touched` performs an **optimistic local patch** on the cached
+  `TablesPageCache`: bumps `rows_estimate` by the affected delta, sets
+  `last_touched_at` for the UI pulse — no HTTP fetch.
+- **`app.py`** — three new `@ext.cache_model` envelopes alongside the
+  existing `DbSchemaSnapshot`: `CatalogCache` (databases on a
+  connection), `TablesPageCache` (paginated table list, ≤200 items per
+  envelope to fit the SDK 64 KB cap), `TableDetailCache` (columns +
+  indexes + FKs for one table). Cache-key builders (`cache_key_catalog`,
+  `cache_key_tables_page`, `cache_key_table_detail`) live in `app.py` as
+  the single source of truth — both `panels.py` and `events.py` use them.
+- **`app.py`** — four HTTP helpers wrapping the backend v1.3.0 tiered
+  routes: `_api_catalog`, `_api_tables_page`, `_api_table_detail`,
+  `_api_exact_count`.
+- **`sql_parser.py`** — `classify_event_kind(sql)` returns
+  `(class, subkind, target_table)` where class ∈ {ddl, dml, read,
+  explain, other}. Used by `fn_run_editor_sql` to pick the right event.
+
+### Changed
+
+- **`panels.py`** — full rewrite. The sidebar render path no longer awaits
+  any HTTP call. Two `ctx.cache.get` reads (catalog + first tables page);
+  on miss, render an "Indexing schema…" placeholder and emit
+  `schema.refresh.requested`. The DDL/DML event split lets DML happen
+  without re-running schema introspection — only structural changes
+  trigger a refetch. The schema tree uses `ui.List(page_size=50,
+  search=True)` for built-in pagination + filter, which stays smooth on
+  50 k-table catalogs.
+- **`panels.py`** — `refresh=` attribute pares down to the events that
+  actually require a re-render: `connection.added`, `connection.deleted`,
+  `connection.selected`, `sql.ddl_executed`, `table.touched`,
+  `schema.indexed`. Removed `row.inserted`, `row.updated`, `row.deleted`,
+  `sql.executed` — those classes of event do not change the schema and
+  the sidebar handles them via the optimistic patch path instead of a
+  full re-render.
+- **`handlers_execute.py`** — `fn_run_editor_sql` now classifies the
+  successfully-executed statement and emits `sql.ddl_executed` (DDL
+  path) or `table.touched` (DML path) with `kind`, `target_table`,
+  `row_delta`. Read paths emit nothing (they don't change anything the
+  sidebar should react to). Failures in the emit path are logged and
+  swallowed — they MUST NOT mask a successful execute from the user.
+- **`main.py`** — imports `events` so the new `@ext.on_event` handlers
+  register at boot.
+
+### Removed
+
+- The synchronous `_api_post("/v1/connections/{id}/schema", …)` call from
+  the body of `@ext.panel("sidebar")`. This is the architectural
+  invariant of the sql-db-scale spec: the panel render path NEVER awaits
+  an HTTP call to the backend. (The legacy endpoint itself stays mounted
+  for backwards-compat with any extension still on 1.4.x; this codebase
+  no longer reaches for it.)
+
+### Compatibility
+
+- SDK pin unchanged (`imperal-sdk==3.4.1`). All used primitives
+  (`ctx.cache`, `@ext.cache_model`, `ctx.events.emit`, `@ext.on_event`,
+  `ui.List(page_size=, search=True)`) exist in 3.4.1; no kernel ask.
+- Wire-contract change vs the backend is **additive**: the four new
+  endpoints sit at `/v1/connections/{id}/{catalog,tables,tables/{n}/detail,tables/{n}/count}`.
+  Legacy `/v1/connections/{id}/schema` continues to serve and is still
+  the source of truth for the chat-handler skeleton mirror until the
+  Phase 6 lazy-skeleton work lands.
+- Existing `DbSchemaSnapshot` mirror (the cache snapshot read by
+  `schema_guard.load_schema_section`) is unchanged on this release —
+  chat-side write validation continues to work exactly as before.
+
+---
+
+## [1.4.3] — 2026-04-29
+
+### Changed
+
+- **`requirements.txt`** — bump `imperal-sdk==3.0.0` → `==3.4.1`. Pulls in the LLM-FU-1/FU-2 stack (gpt-5 / o-series `max_completion_tokens` rename + `temperature` drop) so chains routed through reasoning models stop falling over to `anthropic/haiku`. No source changes — extension code already complies with the 3.x surface (3.3.0 `ChatExtension(model=)` removal done in 1.4.2; 3.4.0 panel-slot whitelist already met by `panels.py` `slot="left"` + `panels_editor.py` `slot="center"`).
+
+---
+
 ## [1.4.2] — 2026-04-29
 
 Architecture audit pass: P0/P1 findings on top of the 1.4.1 LLM-input hardening.

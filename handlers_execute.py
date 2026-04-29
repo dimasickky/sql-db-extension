@@ -1,7 +1,11 @@
 """sql-db · DML/DDL execution handler + universal editor runner."""
 from __future__ import annotations
 
+import logging
+
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+
+log = logging.getLogger("sql-db")
 
 from app import chat, ActionResult, _api_post, require_user_id, build_conn_info
 from handlers_query import _resolve, RunQueryParams, ExplainParams  # noqa: F401
@@ -233,6 +237,34 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
         })
         if result.get("status") != "ok":
             return ActionResult.error(result.get("detail", "Execution failed"))
+
+        # Phase 2 sidebar liveness — classify the executed statement and
+        # emit a precise event so the panel either refetches (DDL) or does an
+        # optimistic local patch (DML). Failures here MUST NOT break the
+        # success return; the sidebar will fall back to the 5-min cache TTL.
+        try:
+            from sql_parser import classify_event_kind
+            klass, subkind, target = classify_event_kind(sql)
+            affected = int(result.get("rows_affected") or 0)
+            database = conn.get("database", "")
+            if klass == "ddl":
+                await ctx.events.emit("sql.ddl_executed", {
+                    "conn_id": conn_id,
+                    "database": database,
+                    "kind": subkind,
+                    "target_table": target,
+                })
+            elif klass == "dml" and target:
+                await ctx.events.emit("table.touched", {
+                    "conn_id": conn_id,
+                    "database": database,
+                    "table": target,
+                    "kind": subkind,
+                    "row_delta": affected,
+                })
+        except Exception as exc:
+            log.warning("sidebar event emit failed (non-fatal): %s", exc)
+
         return ActionResult.success(
             data={
                 "rows_affected": result.get("rows_affected", 0),

@@ -157,6 +157,57 @@ def _find_set_clause(sql: str) -> str | None:
     return sql[start:]
 
 
+# ─── DDL vs DML event classifier (Phase 2 — sql-db-scale) ────────────── #
+#
+# Used by fn_run_editor_sql to emit the right event after a successful
+# execute: DDL → sql.ddl_executed (sidebar refetches), DML → table.touched
+# (optimistic patch). Nothing here parses the FROM clause of a SELECT — read
+# paths emit no schema-related event at all.
+
+_DDL_KINDS = {
+    "CREATE": "create",
+    "DROP": "drop",
+    "ALTER": "alter",
+    "RENAME": "rename",
+    "TRUNCATE": "truncate",
+}
+_DML_KINDS = {
+    "INSERT": "insert",
+    "UPDATE": "update",
+    "DELETE": "delete",
+    "REPLACE": "insert",   # MySQL REPLACE acts like delete+insert; net
+                           # sidebar effect is touch + (likely) +1 row.
+}
+
+
+def classify_event_kind(sql: str) -> tuple[str, str | None, str | None]:
+    """Classify a successfully-executed statement for event routing.
+
+    Returns ``(class, subkind, target_table_or_None)`` where ``class`` is
+    one of ``"ddl"``, ``"dml"``, ``"read"``, ``"explain"``, ``"other"``.
+    Subkind is the lowercased verb (``"insert"``, ``"create"``, …) — useful
+    for metric labels and the table-touched optimistic-patch direction.
+
+    target_table is best-effort: we reuse extract_target_tables() and pick
+    the first hit. Good enough to scope a cache invalidation; mismatches
+    fall back to the 5-min TTL.
+    """
+    if not sql:
+        return ("other", None, None)
+    fw, is_read, is_explain = classify_sql(sql.strip())
+    if is_explain:
+        return ("explain", "explain", None)
+    if is_read:
+        return ("read", (fw or "").lower() or None, None)
+    if fw in _DDL_KINDS:
+        targets = extract_target_tables(sql)
+        return ("ddl", _DDL_KINDS[fw], targets[0] if targets else None)
+    if fw in _DML_KINDS:
+        targets = extract_target_tables(sql)
+        return ("dml", _DML_KINDS[fw], targets[0] if targets else None)
+    return ("other", (fw or "").lower() or None, None)
+
+
 def _split_top_level(s: str, sep: str = ",") -> list[str]:
     """Split on `sep` ignoring separators inside (), '', "", or backticks."""
     out: list[str] = []
