@@ -1,6 +1,6 @@
 {
   "app_id": "sql-db",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "capabilities": [
     "sql-db:read",
     "sql-db:write"

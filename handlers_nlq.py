@@ -5,6 +5,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import chat, ActionResult, _api_post, require_user_id, get_active_connection, build_conn_info
 from handlers_query import _resolve
+from schema_guard import load_schema_section
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
