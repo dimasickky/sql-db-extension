@@ -6,6 +6,77 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.5.8] — 2026-04-30 — SDK 3.5.0 pin + nl_to_sql import fix
+
+### Changed
+
+- **`requirements.txt`** — `imperal-sdk==3.4.1` → `imperal-sdk==3.5.0`. SDK 3.5.0
+  routes `ExtensionsClient.emit()` through `imperal_kernel.audit.record_action`
+  producing an `action_ledger` row per emit for federal observability. Emit signature
+  is unchanged; no extension code changes required.
+
+### Fixed (P0 — nl_to_sql broken since 1.5.5)
+
+- **`handlers_nlq.py`** — missing `from schema_guard import load_schema_section`
+  import. Every call to `nl_to_sql` raised `NameError: name 'load_schema_section'
+  is not defined`, caught by the top-level `except Exception` and returned as
+  `ActionResult.error("name 'load_schema_section' is not defined")` — the user
+  saw a cryptic error instead of a generated SQL query. Root cause: the 1.5.5
+  migration from `ctx.skeleton.get("db_schema")` (raises `SkeletonAccessForbidden`
+  from `@chat.function` handlers) to `load_schema_section(ctx)` (reads `ctx.cache`)
+  forgot to add the corresponding import.
+
+---
+
+## [1.5.7] — 2026-04-30 — *reconstructed from code*
+
+> Session context was lost due to interrupted sessions (rate-limit + account switch
+> during overnight work). This entry is reconstructed from code archaeology.
+
+### Changed
+
+- **`handlers_nlq.py`** — `nl_to_sql` migrated from `ctx.skeleton.get("db_schema")`
+  (raises `SkeletonAccessForbidden` from `@chat.function` scope in SDK 1.6.0+) to
+  `load_schema_section(ctx)` which reads the `DbSchemaSnapshot` from `ctx.cache`.
+  Fallback to live `/schema` fetch remains when cache is cold. Import of
+  `load_schema_section` was accidentally omitted — fixed in 1.5.8.
+
+---
+
+## [1.5.6] — 2026-04-30 — *reconstructed from code*
+
+> Session context was lost. Reconstructed from code.
+
+### Fixed
+
+- **`handlers_rows.py`** — `insert_row`, `update_row`, `delete_row` now call
+  `validate_table_exists(section, params.table)` before the round-trip to db-service.
+  Previously only `validate_columns` was applied; an LLM hallucinating a table name
+  would reach the backend and surface a raw MariaDB error instead of the friendly
+  recovery hint.
+- **`events.py`** — `patch_cache_on_dml` sets `item.last_touched_at = _now_iso()`
+  on the matched row so the sidebar `_table_list_item` renders the `"just now"`
+  `ui.Badge`. Previously the field was never set; the badge never appeared even
+  after successful DML.
+
+---
+
+## [1.5.5] — 2026-04-30 — *reconstructed from code*
+
+> Session context was lost. Reconstructed from code.
+
+### Fixed
+
+- **`panels.py`** — `_table_list_item`: `ui.ListItem` items for tables with a
+  fresh `last_touched_at` now render a `ui.Badge("just now", color="blue")` on the
+  `badge` slot. The field was introduced by `events.patch_cache_on_dml` in 1.5.6
+  (ordering reflects code-archaeology uncertainty on the exact commit sequence).
+- **`app.py`** — `TablesPageItem` model gains `last_touched_at: str | None = None`
+  field, required by the optimistic-UI badge path in `_table_list_item` and the
+  DML patcher in `events.py`.
+
+---
+
 ## [1.5.4] — 2026-04-30 — sidebar liveness coverage on every write path
 
 ### Added
