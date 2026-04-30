@@ -6,6 +6,55 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.5.3] — 2026-04-30 — kernel `@ext.on_event` ctx=None workaround
+
+### Fixed (P0 — sidebar stuck on "Indexing schema…" forever)
+
+The 1.5.x design relied on three `@ext.on_event` handlers
+(`schema.refresh.requested`, `sql.ddl_executed`, `table.touched`) to do
+the cache-mutation work. The Imperal kernel's
+`imperal_kernel.services.rule_engine.evaluate_event` dispatches them
+with literally `await handler_func(None, event_obj)` — i.e. the SDK
+contract leaks no per-user `ctx` into event handlers on the live
+platform. Every `ctx.cache.set` / `ctx.cache.delete` inside an event
+handler raises `AttributeError: 'NoneType' object has no attribute
+'cache'`, the kernel swallows + logs, and the cache never gets
+populated. So the panel's cold-cache placeholder ("Indexing schema…")
+stayed forever — small DBs, large DBs, every user.
+
+### Changed
+
+- **`panels.py`** — cold-cache populator moved INLINE into
+  `_render_schema_block` (now: `_populate_inline`). On a cache miss the
+  panel calls `_api_catalog` + `_api_tables_page` directly, writes both
+  envelopes to `ctx.cache`, and renders with data on the same paint.
+  Bounded by db-service's 5 s `MAX_STATEMENT_TIME` per session, so worst
+  case the panel paints with a real "Schema unavailable" error in
+  ~5–8 s rather than spinning forever. Warm-cache renders stay
+  cache-only sub-millisecond.
+- **`events.py`** — `@ext.on_event` decorators removed; the file now
+  exports plain async helpers (`patch_cache_on_dml`,
+  `invalidate_cache_on_ddl`). The module docstring documents the
+  kernel-contract gap as the reason.
+- **`handlers_execute.py`** — `fn_run_editor_sql` calls those helpers
+  inline after a successful execute (live ctx is available there). The
+  `ctx.events.emit("...")` calls remain — the panel's
+  `refresh="on_event:..."` attribute hooks Redis pub/sub via the
+  kernel's panel re-render dispatch, which works regardless of whether
+  `@ext.on_event` Python handlers ran.
+
+### Architectural note
+
+The Phase 2 spec's optimistic-UI + DDL-invalidation contract is
+preserved: same cache shapes, same emit names, same panel refresh
+semantics. Only the implementation moved from `@ext.on_event` (broken
+on this kernel) to inline call-site work. When the kernel grows a
+ctx-aware on_event dispatch (`handler_func(ctx, event_obj)`), the
+helpers in `events.py` can move back behind decorators with no
+call-site change.
+
+---
+
 ## [1.5.2] — 2026-04-30
 
 ### Fixed (P0 — Developer Portal validator caught these on 1.5.1 deploy)

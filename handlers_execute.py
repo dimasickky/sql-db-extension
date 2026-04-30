@@ -238,32 +238,41 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
         if result.get("status") != "ok":
             return ActionResult.error(result.get("detail", "Execution failed"))
 
-        # Phase 2 sidebar liveness — classify the executed statement and
-        # emit a precise event so the panel either refetches (DDL) or does an
-        # optimistic local patch (DML). Failures here MUST NOT break the
-        # success return; the sidebar will fall back to the 5-min cache TTL.
+        # Phase 2 sidebar liveness — classify the executed statement, then:
+        #   - mutate ctx.cache HERE inline (we have the live ctx; the
+        #     kernel's @ext.on_event dispatch passes ctx=None so cache
+        #     writes from event handlers don't work on this platform),
+        #   - fire the corresponding ctx.events.emit so the panel's
+        #     refresh="on_event:..." re-renders. The Redis pub/sub →
+        #     panel re-render path is independent of @ext.on_event Python
+        #     handlers, so the panel still updates after this completes.
+        # All best-effort: never mask a successful execute.
         try:
             from sql_parser import classify_event_kind
+            from events import patch_cache_on_dml, invalidate_cache_on_ddl
             klass, subkind, target = classify_event_kind(sql)
             affected = int(result.get("rows_affected") or 0)
             database = conn.get("database", "")
             if klass == "ddl":
+                await invalidate_cache_on_ddl(
+                    ctx, conn_id=conn_id, database=database,
+                    target_table=target,
+                )
                 await ctx.events.emit("sql.ddl_executed", {
-                    "conn_id": conn_id,
-                    "database": database,
-                    "kind": subkind,
-                    "target_table": target,
+                    "conn_id": conn_id, "database": database,
+                    "kind": subkind, "target_table": target,
                 })
             elif klass == "dml" and target:
+                await patch_cache_on_dml(
+                    ctx, conn_id=conn_id, database=database, table=target,
+                    kind=subkind, row_delta=affected,
+                )
                 await ctx.events.emit("table.touched", {
-                    "conn_id": conn_id,
-                    "database": database,
-                    "table": target,
-                    "kind": subkind,
-                    "row_delta": affected,
+                    "conn_id": conn_id, "database": database,
+                    "table": target, "kind": subkind, "row_delta": affected,
                 })
         except Exception as exc:
-            log.warning("sidebar event emit failed (non-fatal): %s", exc)
+            log.warning("sidebar liveness step failed (non-fatal): %s", exc)
 
         return ActionResult.success(
             data={
