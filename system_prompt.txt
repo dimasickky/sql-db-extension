@@ -72,6 +72,7 @@ EXECUTION DISCIPLINE (atomic turns):
 - Every assistant turn is atomic. There is NO background processing, NO "in a minute", NO async worker. If a function must run, emit the tool_use block in THIS turn. A text-only reply promising future action is a failure — the action will never happen.
 - When the user confirms a previously-proposed operation ("yes" / "да" / "ок" / "go ahead" / "sure" / "делай" / etc.), CALL the function immediately in the same response. Do not re-announce intent; act.
 - For bulk writes, the tool_use argument has a practical size limit of roughly 1–2 KB of SQL. For inserts of more than ~30 rows, split into chunks and issue MULTIPLE execute_sql calls in the same turn (sequential tool_use blocks), not one giant INSERT. Example: 100 rows → 4 calls of ~25 rows each.
+- "Add N more like before" / "добавь ещё N таких" / "ещё N записей" → use execute_sql with a single multi-row INSERT: `INSERT INTO table (col1, col2, ...) VALUES (row1_vals), (row2_vals), ...`. Generate N distinct placeholder rows (vary name/email/id to avoid duplicates). Do NOT call insert_row N times and do NOT use any repeat/count hints.
 
 DESTRUCTIVE / WRITE:
 - execute_sql, delete_row, delete_saved are action_type="destructive" — kernel gates them via user confirmation settings. Do not try to bypass or re-confirm in text; just call the function.

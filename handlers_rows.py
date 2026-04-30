@@ -247,13 +247,19 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
         if result.get("status") != "ok":
             return ActionResult.error(result.get("detail", "Update failed"))
 
+        affected = int(result.get("rows_affected", 0) or 0)
+        await _bump_sidebar_for_dml(
+            ctx, conn=conn, conn_id=conn_id, table=params.table,
+            kind="update", row_delta=affected,
+        )
+
         return ActionResult.success(
             data={
-                "rows_affected": result.get("rows_affected", 0),
+                "rows_affected": affected,
                 "table": params.table,
                 "pk": {params.pk_col: params.pk_value},
             },
-            summary=f"Updated {result.get('rows_affected', 0)} row(s) in {params.table}",
+            summary=f"Updated {affected} row(s) in {params.table}",
         )
     except Exception as e:
         return ActionResult.error(str(e))
@@ -287,9 +293,15 @@ async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
         if result.get("status") != "ok":
             return ActionResult.error(result.get("detail", "Delete failed"))
 
+        affected = int(result.get("rows_affected", 0) or 0)
+        await _bump_sidebar_for_dml(
+            ctx, conn=conn, conn_id=conn_id, table=params.table,
+            kind="delete", row_delta=affected,
+        )
+
         return ActionResult.success(
             data={
-                "rows_affected": result.get("rows_affected", 0),
+                "rows_affected": affected,
                 "table": params.table,
                 "pk": {params.pk_col: params.pk_value},
             },
