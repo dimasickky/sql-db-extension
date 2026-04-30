@@ -26,18 +26,26 @@ import logging
 
 from imperal_sdk import ui
 
+from datetime import datetime, timezone
+
 from app import (
     ext,
     _api_post,
+    _api_catalog,
+    _api_tables_page,
     _user_id,
     build_conn_info,
     CONN_COLLECTION,
     # Tier-2 cache models + key helpers
     CatalogCache,
+    CatalogDb,
     TablesPageCache,
+    TablesPageItem,
     cache_key_catalog,
     cache_key_tables_page,
     SIDEBAR_PAGE_LIMIT,
+    CATALOG_CACHE_TTL,
+    TABLES_PAGE_CACHE_TTL,
 )
 
 log = logging.getLogger("sql-db")
@@ -137,49 +145,46 @@ async def sql_sidebar(ctx, active_conn_id: str = "", view: str = "main", **kwarg
         conn = active_doc.data
         database = conn.get("database", "")
         if database:
-            schema_block = await _render_schema_block(ctx, active_id, database)
+            schema_block = await _render_schema_block(ctx, conn, active_id, database)
             children.extend(schema_block)
 
     return ui.Stack(children=children, gap=2, className="min-h-full")
 
 
-async def _render_schema_block(ctx, conn_id: str, database: str) -> list:
-    """Cache-only schema block. On miss: render placeholder + fire event.
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
-    Two reads:
-      * CatalogCache for the connection — gives total table count.
-      * First TablesPageCache for the active database — gives rows for the
-        sidebar.
 
-    If either is cold, we render a non-blocking "Indexing schema…" empty
-    state and emit ``schema.refresh.requested``. The populator runs off the
-    panel render path and emits ``schema.indexed`` when done; the panel's
-    refresh= attr re-renders us with data.
+async def _render_schema_block(ctx, conn: dict, conn_id: str, database: str) -> list:
+    """Render the schema tree.
+
+    Cache-first: read CatalogCache + first TablesPageCache. If either is
+    cold, populate INLINE in this same render — kernel's `@ext.on_event`
+    contract on this platform passes ``ctx=None`` to handlers, so we can't
+    delegate cache writes to a background event handler. Inline populate
+    is bounded by the backend's statement timeout=5s on every introspection
+    session, so worst case the panel paints with placeholder + empty error
+    state in ~5–8 s rather than spinning forever.
+
+    On warm cache the path is two `ctx.cache.get` reads — sub-millisecond.
     """
     out: list = [ui.Divider(f"Schema: {database}")]
 
-    try:
-        cat = await ctx.cache.get(CatalogCache, cache_key_catalog(conn_id))
-    except Exception:
-        cat = None
-
-    try:
-        page = await ctx.cache.get(
-            TablesPageCache,
-            cache_key_tables_page(conn_id, database, "", 0, SIDEBAR_PAGE_LIMIT),
-        )
-    except Exception:
-        page = None
+    cat = await _safe_cache_get(ctx, CatalogCache, cache_key_catalog(conn_id))
+    page_key = cache_key_tables_page(conn_id, database, "", 0, SIDEBAR_PAGE_LIMIT)
+    page = await _safe_cache_get(ctx, TablesPageCache, page_key)
 
     if cat is None or page is None:
-        # Cold cache — non-blocking placeholder + ask the populator.
-        out.append(ui.Empty(message="Indexing schema…", icon="Loader"))
-        try:
-            await ctx.events.emit("schema.refresh.requested", {
-                "conn_id": conn_id, "database": database,
-            })
-        except Exception as exc:
-            log.warning("schema.refresh.requested emit failed: %s", exc)
+        # Cold cache — populate inline now, write through, render.
+        cat, page = await _populate_inline(ctx, conn, conn_id, database)
+
+    if cat is None or page is None:
+        # Inline populate failed (target DB unreachable, auth error, …).
+        # Surface a real error rather than a stuck spinner.
+        out.append(ui.Empty(
+            message="Schema unavailable — target DB unreachable or rejected the connection.",
+            icon="AlertTriangle",
+        ))
         return out
 
     if not page.items:
@@ -187,17 +192,103 @@ async def _render_schema_block(ctx, conn_id: str, database: str) -> list:
         return out
 
     items = [_table_list_item(conn_id, t) for t in page.items]
-
-    # ui.List built-in pagination + search → smooth even on 50k tables.
-    # `total_count` shown on the divider so the user knows there's more
-    # behind the page-1 cap. Pages 2+ will be lazy-fetched on demand —
-    # currently the SDK's List doesn't surface pagination event hooks for
-    # us to wire that, so for now we just show first 200; phase-N spec
-    # has the follow-up.
     title = f"Schema: {database} ({page.total_count} tables)"
     out[0] = ui.Divider(title)
     out.append(ui.List(items=items, page_size=50, searchable=True))
     return out
+
+
+async def _safe_cache_get(ctx, model_cls, key):
+    """ctx.cache.get that returns None on any error (miss or backend hiccup)."""
+    try:
+        return await ctx.cache.get(model_cls, key)
+    except Exception:
+        return None
+
+
+async def _populate_inline(ctx, conn: dict, conn_id: str, database: str):
+    """Cold-cache populator — runs on the panel render path with the live ctx.
+
+    Returns (CatalogCache, TablesPageCache) or (None, None) on failure.
+    Writes both envelopes to ctx.cache before returning so subsequent
+    renders are warm-cache fast.
+    """
+    cat_obj: CatalogCache | None = None
+    page_obj: TablesPageCache | None = None
+
+    # T0 — catalog
+    try:
+        cat_resp = await _api_catalog(ctx, conn, conn_id)
+        if cat_resp.get("status") == "ok":
+            cat_obj = CatalogCache(
+                conn_id=conn_id,
+                databases=[
+                    CatalogDb(
+                        name=d.get("name", ""),
+                        table_count=int(d.get("table_count") or 0),
+                        schema_version=d.get("schema_version") or "",
+                    )
+                    for d in cat_resp.get("databases", [])
+                ],
+                fetched_at=_now_iso(),
+            )
+            try:
+                await ctx.cache.set(
+                    cache_key_catalog(conn_id), cat_obj,
+                    ttl_seconds=CATALOG_CACHE_TTL,
+                )
+            except Exception as exc:
+                log.warning("CatalogCache write failed: %s", exc)
+        else:
+            log.warning("T0 catalog: %s", cat_resp.get("detail"))
+    except Exception as exc:
+        log.warning("T0 catalog raised: %s", exc)
+
+    # T1 — first 200 tables of the active DB, no search, offset=0
+    try:
+        page_resp = await _api_tables_page(
+            ctx, conn, conn_id, database,
+            search="", offset=0, limit=SIDEBAR_PAGE_LIMIT,
+        )
+        if page_resp.get("status") == "ok":
+            page_obj = TablesPageCache(
+                conn_id=conn_id,
+                database=database,
+                search="",
+                offset=0,
+                limit=SIDEBAR_PAGE_LIMIT,
+                items=[
+                    TablesPageItem(
+                        name=i.get("name", ""),
+                        type=i.get("type", "BASE TABLE"),
+                        engine=i.get("engine", ""),
+                        rows_estimate=int(i.get("rows_estimate") or 0),
+                        size_bytes=int(i.get("size_bytes") or 0),
+                        last_modified=i.get("last_modified"),
+                        comment=i.get("comment", ""),
+                    )
+                    for i in page_resp.get("items", [])
+                ],
+                total_count=int(page_resp.get("total_count") or 0),
+                schema_version=page_resp.get("schema_version") or "",
+                fetched_at=_now_iso(),
+            )
+            try:
+                await ctx.cache.set(
+                    cache_key_tables_page(
+                        conn_id, database, "", 0, SIDEBAR_PAGE_LIMIT,
+                    ),
+                    page_obj,
+                    ttl_seconds=TABLES_PAGE_CACHE_TTL,
+                )
+            except Exception as exc:
+                log.warning("TablesPageCache write failed: %s", exc)
+        else:
+            log.warning("T1 first-page: %s", page_resp.get("detail"))
+    except Exception as exc:
+        log.warning("T1 first-page raised: %s", exc)
+
+    return cat_obj, page_obj
 
 
 def _table_list_item(conn_id: str, t) -> ui.ListItem:
