@@ -7,6 +7,7 @@ parameterized queries for safe escaping.
 from __future__ import annotations
 
 import json as _json
+import logging
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
@@ -17,6 +18,31 @@ from schema_guard import (
     validate_columns,
     validate_table_exists,
 )
+
+log = logging.getLogger("sql-db")
+
+
+async def _bump_sidebar_for_dml(
+    ctx, *, conn, conn_id: str, table: str, kind: str, row_delta: int,
+) -> None:
+    """Optimistic-UI: patch the cached sidebar page + signal panel re-render.
+
+    Best-effort. Same wiring fn_run_editor_sql / fn_execute_sql use; lifted
+    here so insert_row/update_row/delete_row stay live too.
+    """
+    try:
+        from events import patch_cache_on_dml
+        database = (conn or {}).get("database", "")
+        await patch_cache_on_dml(
+            ctx, conn_id=conn_id, database=database, table=table,
+            kind=kind, row_delta=row_delta,
+        )
+        await ctx.events.emit("table.touched", {
+            "conn_id": conn_id, "database": database,
+            "table": table, "kind": kind, "row_delta": row_delta,
+        })
+    except Exception as exc:
+        log.warning("sidebar liveness step failed (non-fatal): %s", exc)
 
 
 # ─── Event pulse (internal) ───────────────────────────────────────────── #
@@ -165,9 +191,15 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
         if result.get("status") != "ok":
             return ActionResult.error(result.get("detail", "Insert failed"))
 
+        affected = int(result.get("rows_affected", 0) or 0)
+        await _bump_sidebar_for_dml(
+            ctx, conn=conn, conn_id=conn_id, table=params.table,
+            kind="insert", row_delta=affected,
+        )
+
         return ActionResult.success(
             data={
-                "rows_affected": result.get("rows_affected", 0),
+                "rows_affected": affected,
                 "inserted_id": result.get("inserted_id"),
                 "table": params.table,
             },

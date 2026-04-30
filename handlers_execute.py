@@ -162,6 +162,35 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
         if query_type in _DDL_VERBS:
             await invalidate_schema_cache(ctx)
 
+        # Phase 2 sidebar liveness — same wiring as fn_run_editor_sql.
+        # Inline cache mutation (kernel @ext.on_event has ctx=None on this
+        # platform) + emit() for panel re-render. Best-effort — never
+        # mask a successful execute.
+        try:
+            from sql_parser import classify_event_kind
+            from events import patch_cache_on_dml, invalidate_cache_on_ddl
+            klass, subkind, target = classify_event_kind(sql)
+            database = conn.get("database", "")
+            if klass == "ddl":
+                await invalidate_cache_on_ddl(
+                    ctx, conn_id=conn_id, database=database, target_table=target,
+                )
+                await ctx.events.emit("sql.ddl_executed", {
+                    "conn_id": conn_id, "database": database,
+                    "kind": subkind, "target_table": target,
+                })
+            elif klass == "dml" and target:
+                await patch_cache_on_dml(
+                    ctx, conn_id=conn_id, database=database, table=target,
+                    kind=subkind, row_delta=rows_affected,
+                )
+                await ctx.events.emit("table.touched", {
+                    "conn_id": conn_id, "database": database,
+                    "table": target, "kind": subkind, "row_delta": rows_affected,
+                })
+        except Exception as exc:
+            log.warning("sidebar liveness step failed (non-fatal): %s", exc)
+
         return ActionResult.success(
             data={
                 "rows_affected": rows_affected,

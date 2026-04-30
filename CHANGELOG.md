@@ -6,6 +6,39 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.5.4] — 2026-04-30 — sidebar liveness coverage on every write path
+
+### Added
+
+1.5.3 wired sidebar liveness only for `fn_run_editor_sql` (the editor
+"Run" button). Chat-side writes (`execute_sql`) and panel row-form
+writes (`insert_row` / `update_row` / `delete_row`) executed
+successfully on the database but did NOT update the sidebar — the user
+saw the table list go stale until the 5-min cache TTL expired.
+
+This release wires the same optimistic-patch + emit step into all four
+write entry points:
+
+- **`handlers_execute.fn_execute_sql`** — chat-LLM-invoked execute. Same
+  classify_event_kind branch as `run_editor_sql`: DDL → invalidate
+  cache + emit `sql.ddl_executed`; DML → patch + emit `table.touched`.
+- **`handlers_rows.{fn_insert_row, fn_update_row, fn_delete_row}`** —
+  row CRUD via the panel form. Each calls a shared
+  `_bump_sidebar_for_dml(ctx, conn, conn_id, table, kind, row_delta)`
+  helper that runs `patch_cache_on_dml` + emits `table.touched`.
+
+### Note
+
+Chat write-path was never broken — `execute_sql` and the row CRUD
+handlers continued to call db-service `/execute` and `/row` exactly as
+before, the database side worked correctly. The visible defect was UI
+freshness only: sidebar didn't reflect a chat-side write until cache
+TTL expired. 1.5.4 closes that gap so the badge + row-count update lands
+the moment the chat function returns success, regardless of which entry
+point the user used.
+
+---
+
 ## [1.5.3] — 2026-04-30 — kernel `@ext.on_event` ctx=None workaround
 
 ### Fixed (P0 — sidebar stuck on "Indexing schema…" forever)
