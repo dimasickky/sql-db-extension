@@ -6,6 +6,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.5.1] — 2026-04-30
+
+### Fixed (P0)
+
+- **`app.py`** — restore the three new `@ext.cache_model` envelopes and the
+  cache-key builder helpers that 1.5.0 relied on but did not actually
+  contain. A Nextcloud sync conflict overwrote the additions to `app.py`
+  between local edit and `git push`, so 1.5.0 deployed with `events.py`
+  importing names (`CatalogCache`, `TablesPageCache`, `TableDetailCache`,
+  `CatalogDb`, `TablesPageItem`, `cache_key_catalog`, `cache_key_tables_page`,
+  `cache_key_table_detail`, `CATALOG_CACHE_TTL`, `TABLES_PAGE_CACHE_TTL`,
+  `SIDEBAR_PAGE_LIMIT`) that did not exist on the deployed `app.py`.
+  Worker logged `cannot import name 'CatalogCache' from 'app'` on every
+  load attempt — extension was effectively offline since deploy. Sidebar
+  loaded nothing for everyone, including small-DB users (Дмитрий's own
+  panel was the first to surface this).
+- HTTP helpers (`_api_catalog`, `_api_tables_page`, `_api_table_detail`,
+  `_api_exact_count`) survived the conflict; only the cache-models block
+  was lost.
+
+No functional change vs the 1.5.0 design — this restores the file to the
+intended state. All py_compile + symbol-presence checks now pass.
+
+---
+
 ## [1.5.0] — 2026-04-30 — sql-db-scale Phase 2 (sidebar liveness foundation)
 
 Sidebar render time is now O(1) in target-DB size. The previous render path
