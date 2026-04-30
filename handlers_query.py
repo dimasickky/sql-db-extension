@@ -3,10 +3,15 @@ from __future__ import annotations
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
+import logging
+
 from app import (
     chat, ActionResult, _api_post, require_user_id,
     resolve_connection, get_connection_by_id, build_conn_info,
+    DbSchemaSnapshot, SCHEMA_CACHE_KEY, SCHEMA_CACHE_TTL,
 )
+
+log = logging.getLogger("sql-db")
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -155,6 +160,29 @@ async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
         })
 
         tables = result.get("tables", [])
+
+        # Mirror into ctx.cache so schema guard in execute_sql / insert_row
+        # has up-to-date column data immediately — even when the skeleton
+        # hasn't ticked yet (cold cache on fresh sessions).
+        try:
+            compact = []
+            for t in tables[:50]:
+                cols = [
+                    {"name": c.get("COLUMN_NAME", ""), "type": c.get("COLUMN_TYPE", ""),
+                     "key": c.get("COLUMN_KEY", "")}
+                    for c in t.get("columns", [])
+                ]
+                compact.append({"name": t["name"], "rows": t.get("rows", 0), "columns": cols})
+            snap = DbSchemaSnapshot.model_validate({
+                "database": database,
+                "connection": conn.get("name", ""),
+                "table_count": len(compact),
+                "tables": compact,
+            })
+            await ctx.cache.set(SCHEMA_CACHE_KEY, snap, ttl_seconds=SCHEMA_CACHE_TTL)
+        except Exception as exc:
+            log.debug("get_schema: cache mirror failed (non-fatal): %s", exc)
+
         return ActionResult.success(
             data={"database": database, "tables": tables, "table_count": len(tables)},
             summary=f"Database '{database}': {len(tables)} table(s)",
