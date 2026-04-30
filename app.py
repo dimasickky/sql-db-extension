@@ -292,7 +292,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "sql-db",
-    version="1.5.0",
+    version="1.5.1",
     capabilities=["sql-db:read", "sql-db:write"],
 )
 
@@ -349,6 +349,128 @@ class DbSchemaSnapshot(_BM):
     table_count: int = 0
     tables: list[DbSchemaTable] = []
     note: str = ""
+
+
+# ─── Tiered schema cache models (Phase 2 — sql-db-scale) ──────────────── #
+#
+# Power the sidebar's cache-only render path. Layout invariants:
+#   - one envelope per logical query (catalog / tables-page / table-detail);
+#   - never one giant blob (SDK envelope cap is 64 KB);
+#   - schema_version on every envelope so clients detect drift between
+#     a stale cached page and a freshly DDL'd target DB;
+#   - cache keys are extension-scoped automatically by SDK, plus prefixed
+#     by conn_id + database so multiple connections don't collide.
+#
+# Cache key conventions (see cache_key_* helpers below):
+#   catalog:{conn_id}                              → CatalogCache
+#   tables:{conn_id}:{db}:{search}:{offset}:{limit} → TablesPageCache
+#   table:{conn_id}:{db}:{table_name}              → TableDetailCache
+
+CATALOG_CACHE_TTL = 300
+TABLES_PAGE_CACHE_TTL = 300
+TABLE_DETAIL_CACHE_TTL = 600
+
+SIDEBAR_PAGE_LIMIT = 200       # default page_size for first paint
+HUGE_DB_THRESHOLD = 200        # > N tables → skeleton goes names-only
+
+
+class CatalogDb(_BM):
+    name: str
+    table_count: int = 0
+    schema_version: str = ""
+
+
+@ext.cache_model("catalog")
+class CatalogCache(_BM):
+    """T0 cache — list of databases on a connection."""
+    conn_id: str
+    databases: list[CatalogDb] = []
+    fetched_at: str = ""             # ISO8601
+
+
+class TablesPageItem(_BM):
+    name: str
+    type: str = "BASE TABLE"
+    engine: str = ""
+    rows_estimate: int = 0
+    size_bytes: int = 0
+    last_modified: str | None = None
+    comment: str = ""
+    last_touched_at: str | None = None  # set by optimistic-UI patcher
+
+
+@ext.cache_model("tables_page")
+class TablesPageCache(_BM):
+    """T1 cache — paginated table list for one database."""
+    conn_id: str
+    database: str
+    search: str = ""
+    offset: int = 0
+    limit: int = SIDEBAR_PAGE_LIMIT
+    items: list[TablesPageItem] = []
+    total_count: int = 0
+    schema_version: str = ""
+    fetched_at: str = ""
+
+
+class TableColumn(_BM):
+    COLUMN_NAME: str = ""
+    COLUMN_TYPE: str = ""
+    IS_NULLABLE: str = ""
+    COLUMN_KEY: str = ""
+    COLUMN_DEFAULT: str | None = None
+    EXTRA: str = ""
+    COLUMN_COMMENT: str = ""
+
+
+class TableIndex(_BM):
+    name: str
+    unique: bool = False
+    columns: list[str] = []
+
+
+class TableForeignKey(_BM):
+    name: str = ""
+    column_name: str = ""
+    ref_schema: str = ""
+    ref_table: str = ""
+    ref_column: str = ""
+
+
+@ext.cache_model("table_detail")
+class TableDetailCache(_BM):
+    """T2 cache — columns + indexes + FKs for one table."""
+    conn_id: str
+    database: str
+    table: str
+    type: str = "BASE TABLE"
+    engine: str = ""
+    rows_estimate: int = 0
+    size_bytes: int = 0
+    last_modified: str | None = None
+    comment: str = ""
+    columns: list[TableColumn] = []
+    indexes: list[TableIndex] = []
+    foreign_keys: list[TableForeignKey] = []
+    schema_version: str = ""
+    fetched_at: str = ""
+
+
+# ─── Cache-key builders (single source of truth) ──────────────────────── #
+
+def cache_key_catalog(conn_id: str) -> str:
+    return f"catalog:{conn_id}"
+
+
+def cache_key_tables_page(
+    conn_id: str, database: str,
+    search: str = "", offset: int = 0, limit: int = SIDEBAR_PAGE_LIMIT,
+) -> str:
+    return f"tables:{conn_id}:{database}:{search}:{offset}:{limit}"
+
+
+def cache_key_table_detail(conn_id: str, database: str, table: str) -> str:
+    return f"table:{conn_id}:{database}:{table}"
 
 
 # ─── Health Check ─────────────────────────────────────────────────────── #
