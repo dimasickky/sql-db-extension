@@ -6,6 +6,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [1.5.2] — 2026-04-30
+
+### Fixed (P0 — Developer Portal validator caught these on 1.5.1 deploy)
+
+- **`panels.py`** — `ui.List(... search=True)` → `searchable=True`. Wrong
+  kwarg name; SDK 3.4.x `ui.List` accepts `searchable` (per
+  `imperal_sdk.ui.data.List` signature: `bulk_actions, extra_info,
+  grouped_by, items, on_end_reached, page_size, searchable, selectable,
+  total_items`). The render call would raise `TypeError` on the first
+  warm-cache paint.
+- **`panels.py`** — `ui.ListItem(... className="pulse")` removed.
+  `className` is not a valid `ui.ListItem` kwarg (the SDK whitelist is:
+  `actions, avatar, badge, draggable, droppable, expandable,
+  expanded_content, icon, id, meta, on_click, on_drop, selected,
+  subtitle, title`). Replaced the would-be CSS pulse animation with a
+  `ui.Badge("just now", color="blue")` on the `badge` slot — same
+  semantic intent (signal a freshly-touched row), uses a real DUI
+  primitive. Long-form follow-up: when SDK exposes a `className` /
+  per-item style hook on `ListItem`, swap back to a fading CSS
+  animation. For now the badge is the contract.
+
+---
+
 ## [1.5.1] — 2026-04-30
 
 ### Fixed (P0)
