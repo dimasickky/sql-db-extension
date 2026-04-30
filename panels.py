@@ -196,7 +196,7 @@ async def _render_schema_block(ctx, conn_id: str, database: str) -> list:
     # has the follow-up.
     title = f"Schema: {database} ({page.total_count} tables)"
     out[0] = ui.Divider(title)
-    out.append(ui.List(items=items, page_size=50, search=True))
+    out.append(ui.List(items=items, page_size=50, searchable=True))
     return out
 
 
@@ -220,18 +220,20 @@ def _table_list_item(conn_id: str, t) -> ui.ListItem:
     if t.engine:
         subtitle_parts.append(t.engine)
 
-    class_name = ""
-    if t.last_touched_at:
-        # The DUI side maps `pulse` to a brief CSS animation; safe no-op
-        # on the chat-only render path.
-        class_name = "pulse"
+    # Optimistic-UI signal: a freshly touched table gets a non-blocking
+    # "just now" Badge so the user sees their DML reflected immediately.
+    # ui.ListItem has no className/CSS hook in SDK 3.4.x, so we lean on
+    # `badge` (a built-in slot) instead of injecting a class name.
+    just_touched_badge = (
+        ui.Badge("just now", color="blue") if t.last_touched_at else None
+    )
 
     return ui.ListItem(
         id=name,
         title=name,
         subtitle=" · ".join(subtitle_parts),
         icon="Table",
-        className=class_name,
+        badge=just_touched_badge,
         on_click=ui.Call(
             "__panel__editor",
             note_id=conn_id, tab="results", action="run", sql=select_sql,
