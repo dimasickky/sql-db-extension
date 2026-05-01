@@ -1,6 +1,11 @@
 {
+  "manifest_schema_version": 3,
   "app_id": "sql-db",
-  "version": "1.5.8",
+  "version": "2.0.0",
+  "name": "SQL Database",
+  "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
+  "icon": "icon.svg",
+  "actions_explicit": true,
   "capabilities": [
     "sql-db:read",
     "sql-db:write"
@@ -8,7 +13,7 @@
   "tools": [
     {
       "name": "tool_sql_db_chat",
-      "description": "SQL Database assistant \u2014 connect to MySQL/MariaDB databases, browse schema and tables, run SELECT queries, execute DML/DDL (INSERT, UPDATE, DELETE, ALTER, CREATE, DROP), insert/update/delete single rows, natural-language to SQL (nl_to_sql), explain execution plans, dry-run writes, manage saved queries, view SQL query execution history, switch between connections. NOT for email or chat message history, application audit logs, file contents, notes, or NoSQL stores.",
+      "description": "SQL Database assistant — connect to MySQL/MariaDB databases, browse schema, run queries, explain plans, manage saved queries",
       "scopes": [],
       "parameters": {
         "message": {
@@ -23,47 +28,792 @@
     },
     {
       "name": "skeleton_refresh_db_schema",
-      "description": "Refresh active database schema cache — tables, columns, row counts.",
-      "scopes": ["sql-db:read"],
-      "parameters": {
-        "kwargs": {"type": "string", "required": true}
-      }
+      "description": "Active database schema cache — tables, columns, row counts.",
+      "scopes": [],
+      "parameters": {}
     },
     {
       "name": "skeleton_alert_db_schema",
-      "description": "Alert companion for db_schema skeleton — invoked by kernel when alert=True.",
-      "scopes": ["sql-db:read"],
+      "description": "Alert on schema changes (tables added or removed).",
+      "scopes": [
+        "sql-db.read"
+      ],
       "parameters": {
-        "kwargs": {"type": "string", "required": true}
-      }
-    },
-    {
-      "name": "__panel__sidebar",
-      "description": "Panel: SQL DB",
-      "scopes": [],
-      "parameters": {
-        "params": {
+        "old": {
+          "type": "string",
+          "required": false
+        },
+        "new": {
+          "type": "string",
+          "required": false
+        },
+        "kwargs": {
           "type": "string",
           "required": true
         }
       }
     },
     {
-      "name": "__panel__editor",
-      "description": "Panel: SQL Editor",
+      "name": "add_connection",
+      "description": "Add a new MySQL/MariaDB connection. Tests connectivity before saving.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:connection"
+      ],
+      "params_schema": {
+        "description": "Add a new database connection.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Short connection label (e.g. 'whmcs', 'production'). Optional — derived from host+database when empty.",
+            "title": "Name",
+            "type": "string"
+          },
+          "host": {
+            "description": "MySQL host (e.g. server8.webhostmost.com)",
+            "title": "Host",
+            "type": "string"
+          },
+          "port": {
+            "default": 3306,
+            "description": "MySQL port",
+            "title": "Port",
+            "type": "integer"
+          },
+          "db_user": {
+            "description": "MySQL username",
+            "title": "Db User",
+            "type": "string"
+          },
+          "password": {
+            "description": "MySQL password (will be encrypted)",
+            "title": "Password",
+            "type": "string"
+          },
+          "database": {
+            "default": "",
+            "description": "Default database name",
+            "title": "Database",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host",
+          "db_user",
+          "password"
+        ],
+        "title": "AddConnectionParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "connection.added",
       "scopes": [],
-      "parameters": {
-        "params": {
-          "type": "string",
-          "required": true
-        }
-      }
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "list_connections",
+      "description": "List all saved database connections with their status.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Empty params model for @chat.function handlers with no business inputs (V17).",
+        "properties": {},
+        "title": "NoParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "resolve_connection_by_database",
+      "description": "Resolve connection_id for a database or connection name. Use as the first step in automations before run_query/execute_sql, e.g. resolve_connection_by_database(database_name='ijodghbk_test') -> pass the returned connection_id into the next step.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Resolve a connection by database or connection name.",
+        "properties": {
+          "database_name": {
+            "description": "Database name (e.g. 'ijodghbk_test') or connection name",
+            "title": "Database Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "database_name"
+        ],
+        "title": "ResolveConnByDbParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "test_connection",
+      "description": "Test connectivity for an existing saved connection.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Target a specific connection.",
+        "properties": {
+          "connection_id": {
+            "description": "Connection ID",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id"
+        ],
+        "title": "ConnectionIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "select_connection",
+      "description": "Switch the active database connection.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:connection"
+      ],
+      "params_schema": {
+        "description": "Switch active connection.",
+        "properties": {
+          "connection_id": {
+            "description": "Connection ID to activate",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id"
+        ],
+        "title": "SelectConnectionParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "connection.selected",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "delete_connection",
+      "description": "Delete a saved database connection permanently.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "delete:connection"
+      ],
+      "params_schema": {
+        "description": "Target a specific connection.",
+        "properties": {
+          "connection_id": {
+            "description": "Connection ID",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id"
+        ],
+        "title": "ConnectionIdParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "connection.deleted",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "run_query",
+      "description": "Run a read-only query (SELECT/WITH/SHOW/DESCRIBE/EXPLAIN). Use execute_sql for INSERT/UPDATE/DELETE/DDL.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Run a SELECT query.",
+        "properties": {
+          "sql": {
+            "description": "SQL SELECT query",
+            "title": "Sql",
+            "type": "string"
+          },
+          "limit": {
+            "default": 100,
+            "description": "Max rows to return",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql"
+        ],
+        "title": "RunQueryParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "get_schema",
+      "description": "Get database schema — tables, columns, indexes.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Get database schema.",
+        "properties": {
+          "database": {
+            "default": "",
+            "description": "Database name (empty = default)",
+            "title": "Database",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "title": "GetSchemaParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "explain_query",
+      "description": "Run EXPLAIN on a query to see execution plan.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Explain a query.",
+        "properties": {
+          "sql": {
+            "description": "SQL query to explain",
+            "title": "Sql",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql"
+        ],
+        "title": "ExplainParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "dry_run",
+      "description": "Dry-run a DML statement: execute in transaction, count affected rows, then ROLLBACK.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Dry-run a DML statement.",
+        "properties": {
+          "sql": {
+            "description": "DML statement to dry-run",
+            "title": "Sql",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql"
+        ],
+        "title": "DryRunParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "execute_sql",
+      "description": "Execute a write statement (INSERT, UPDATE, DELETE, REPLACE, ALTER, CREATE, DROP, TRUNCATE). Use this for all database mutations including automation-triggered inserts.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "execute:sql"
+      ],
+      "params_schema": {
+        "description": "Execute a DML/DDL statement.",
+        "properties": {
+          "sql": {
+            "description": "SQL statement (INSERT/UPDATE/DELETE/ALTER/CREATE/DROP)",
+            "title": "Sql",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql"
+        ],
+        "title": "ExecuteSqlParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "sql.executed",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "run_editor_sql",
+      "description": "Run any SQL from the editor. Auto-detects: SELECT goes to query, DML/DDL goes to execute.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "execute:sql"
+      ],
+      "params_schema": {
+        "description": "Run any SQL from the editor — auto-detects type.",
+        "properties": {
+          "sql": {
+            "description": "SQL statement",
+            "title": "Sql",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql"
+        ],
+        "title": "RunEditorSqlParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "sql.executed",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "nl_to_sql",
+      "description": "Convert a natural language question to SQL using the database schema.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Convert natural language question to SQL.",
+        "properties": {
+          "question": {
+            "description": "Natural language question about the data",
+            "title": "Question",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "NlToSqlParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "list_history",
+      "description": "List recent query history for the active connection.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "List query history.",
+        "properties": {
+          "limit": {
+            "default": 20,
+            "description": "Max entries",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "title": "ListHistoryParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "save_query",
+      "description": "Save a query for later use.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:saved_query"
+      ],
+      "params_schema": {
+        "description": "Save a query.",
+        "properties": {
+          "name": {
+            "description": "Query name",
+            "title": "Name",
+            "type": "string"
+          },
+          "sql_text": {
+            "description": "SQL text",
+            "title": "Sql Text",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "description": "Optional description",
+            "title": "Description",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "sql_text"
+        ],
+        "title": "SaveQueryParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "query.saved",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "list_saved",
+      "description": "List saved queries for the active connection.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "List saved queries.",
+        "properties": {
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "title": "ListSavedParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "run_saved",
+      "description": "Run a previously saved query.",
+      "action_type": "read",
+      "chain_callable": false,
+      "effects": [],
+      "params_schema": {
+        "description": "Run a saved query.",
+        "properties": {
+          "query_id": {
+            "description": "Saved query ID",
+            "title": "Query Id",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query_id"
+        ],
+        "title": "RunSavedParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "delete_saved",
+      "description": "Delete a saved query.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "delete:saved_query"
+      ],
+      "params_schema": {
+        "description": "Delete a saved query.",
+        "properties": {
+          "query_id": {
+            "description": "Saved query ID",
+            "title": "Query Id",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query_id"
+        ],
+        "title": "DeleteSavedParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "query.deleted",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "_pulse_sql_executed",
+      "description": "Internal side-channel: emit sql.executed after a panel-direct DML so the sidebar schema refreshes. Do not call from chat — for extension-internal use only.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "execute:sql"
+      ],
+      "params_schema": {
+        "description": "Side-channel to make the kernel publish `sql-db.sql.executed`.\n\nCalled via `ctx.extensions.call(...)` from panel handlers that ran DML\nthrough `/execute` or `/row` directly — those bypass @chat.function, so\nthe kernel has no way to emit the event automatically. This tiny\nwrite-typed function gives it a hook.",
+        "properties": {
+          "kind": {
+            "default": "dml",
+            "description": "Origin marker for debugging",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "PulseParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "sql.executed",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "insert_row",
+      "description": "Insert a new row into a table. Values as JSON object of column -> value.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "create:row"
+      ],
+      "params_schema": {
+        "description": "Insert a new row into a table.",
+        "properties": {
+          "table": {
+            "description": "Table name",
+            "title": "Table",
+            "type": "string"
+          },
+          "values_json": {
+            "description": "JSON object of column -> value to insert",
+            "title": "Values Json",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "values_json"
+        ],
+        "title": "InsertRowParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "row.inserted",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "update_row",
+      "description": "Update a single row identified by primary key. Changes as JSON object of column -> new value.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "update:row"
+      ],
+      "params_schema": {
+        "description": "Update a single row by primary key.",
+        "properties": {
+          "table": {
+            "description": "Table name",
+            "title": "Table",
+            "type": "string"
+          },
+          "pk_col": {
+            "description": "Primary key column name",
+            "title": "Pk Col",
+            "type": "string"
+          },
+          "pk_value": {
+            "description": "Primary key value of the row to update",
+            "title": "Pk Value",
+            "type": "string"
+          },
+          "values_json": {
+            "description": "JSON object of column -> new value",
+            "title": "Values Json",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "pk_col",
+          "pk_value",
+          "values_json"
+        ],
+        "title": "UpdateRowParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "row.updated",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "delete_row",
+      "description": "Delete a single row identified by primary key. Requires confirmation.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "delete:row"
+      ],
+      "params_schema": {
+        "description": "Delete a single row by primary key.",
+        "properties": {
+          "table": {
+            "description": "Table name",
+            "title": "Table",
+            "type": "string"
+          },
+          "pk_col": {
+            "description": "Primary key column name",
+            "title": "Pk Col",
+            "type": "string"
+          },
+          "pk_value": {
+            "description": "Primary key value of the row to delete",
+            "title": "Pk Value",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "pk_col",
+          "pk_value"
+        ],
+        "title": "DeleteRowParams",
+        "type": "object"
+      },
+      "return_schema": {},
+      "event": "row.deleted",
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
     }
   ],
   "signals": [],
   "schedules": [],
   "required_scopes": [
-    "sql-db:read",
-    "sql-db:write"
-  ]
+    "sql-db.read"
+  ],
+  "icon_size_bytes": 296,
+  "lifecycle": {
+    "on_install": true,
+    "health_check": {
+      "interval_sec": 60
+    }
+  },
+  "lifecycle_hooks": {
+    "on_install": {
+      "signature": "(ctx) -> 'None'"
+    }
+  }
 }

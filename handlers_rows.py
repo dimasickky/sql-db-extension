@@ -59,7 +59,7 @@ class PulseParams(BaseModel):
 
 
 @chat.function(
-    "_pulse_sql_executed", action_type="write", event="sql.executed",
+    "_pulse_sql_executed", action_type="write", chain_callable=True, effects=["execute:sql"], event="sql.executed",
     description=(
         "Internal side-channel: emit sql.executed after a panel-direct DML "
         "so the sidebar schema refreshes. Do not call from chat — for "
@@ -155,7 +155,7 @@ async def _resolve(ctx, connection_id: str = ""):
 # ─── Handlers ─────────────────────────────────────────────────────────── #
 
 @chat.function(
-    "insert_row", action_type="write", event="row.inserted",
+    "insert_row", action_type="write", chain_callable=True, effects=["create:row"], event="row.inserted",
     description="Insert a new row into a table. Values as JSON object of column -> value.",
 )
 async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
@@ -180,7 +180,7 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
         if not conn:
             return ActionResult.error("No active connection")
 
-        result = await _api_post(f"/v1/connections/{conn_id}/row", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/row", {
             "user_id": require_user_id(ctx),
             "operation": "insert",
             "table": params.table,
@@ -210,7 +210,7 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
 
 
 @chat.function(
-    "update_row", action_type="write", event="row.updated",
+    "update_row", action_type="write", chain_callable=True, effects=["update:row"], event="row.updated",
     description="Update a single row identified by primary key. Changes as JSON object of column -> new value.",
 )
 async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
@@ -235,7 +235,7 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
         if not conn:
             return ActionResult.error("No active connection")
 
-        result = await _api_post(f"/v1/connections/{conn_id}/row", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/row", {
             "user_id": require_user_id(ctx),
             "operation": "update",
             "table": params.table,
@@ -266,7 +266,7 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
 
 
 @chat.function(
-    "delete_row", action_type="destructive", event="row.deleted",
+    "delete_row", action_type="destructive", chain_callable=True, effects=["delete:row"], event="row.deleted",
     description="Delete a single row identified by primary key. Requires confirmation.",
 )
 async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
@@ -282,7 +282,7 @@ async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
         if not conn:
             return ActionResult.error("No active connection")
 
-        result = await _api_post(f"/v1/connections/{conn_id}/row", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/row", {
             "user_id": require_user_id(ctx),
             "operation": "delete",
             "table": params.table,

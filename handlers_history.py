@@ -89,7 +89,7 @@ async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
         if not conn:
             return ActionResult.error("No active connection.")
 
-        result = await _api_get(
+        result = await _api_get(ctx,
             f"/v1/connections/{conn_id}/history",
             {"user_id": require_user_id(ctx), "limit": params.limit},
         )
@@ -103,7 +103,7 @@ async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
 
 
 @chat.function(
-    "save_query", action_type="write", event="query.saved",
+    "save_query", action_type="write", chain_callable=True, effects=["create:saved_query"], event="query.saved",
     description="Save a query for later use.",
 )
 async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
@@ -113,7 +113,7 @@ async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
         if not conn:
             return ActionResult.error("No active connection.")
 
-        result = await _api_post(f"/v1/connections/{conn_id}/saved", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/saved", {
             "user_id": require_user_id(ctx),
             "conn_id": conn_id,
             "name": params.name,
@@ -140,7 +140,7 @@ async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
         if not conn:
             return ActionResult.error("No active connection.")
 
-        result = await _api_get(
+        result = await _api_get(ctx,
             f"/v1/connections/{conn_id}/saved",
             {"user_id": require_user_id(ctx)},
         )
@@ -166,7 +166,7 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
             return ActionResult.error("No active connection.")
 
         # Get the saved query
-        saved_list = await _api_get(
+        saved_list = await _api_get(ctx,
             f"/v1/connections/{conn_id}/saved",
             {"user_id": require_user_id(ctx)},
         )
@@ -179,7 +179,7 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
             return ActionResult.error("Saved query not found")
 
         # Execute it
-        result = await _api_post(f"/v1/connections/{conn_id}/query", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/query", {
             "user_id": require_user_id(ctx),
             "sql": target["sql_text"],
             "limit": 100,
@@ -202,7 +202,7 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
 
 
 @chat.function(
-    "delete_saved", action_type="destructive", event="query.deleted",
+    "delete_saved", action_type="destructive", chain_callable=True, effects=["delete:saved_query"], event="query.deleted",
     description="Delete a saved query.",
 )
 async def fn_delete_saved(ctx, params: DeleteSavedParams) -> ActionResult:
@@ -212,7 +212,7 @@ async def fn_delete_saved(ctx, params: DeleteSavedParams) -> ActionResult:
         if not conn:
             return ActionResult.error("No active connection.")
 
-        await _api_delete(
+        await _api_delete(ctx, 
             f"/v1/connections/{conn_id}/saved/{params.query_id}",
             {"user_id": require_user_id(ctx)},
         )
