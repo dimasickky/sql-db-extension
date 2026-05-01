@@ -50,7 +50,7 @@ async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
 
         if not schema_data or not schema_data.get("tables"):
             # Fetch fresh schema
-            result = await _api_post(f"/v1/connections/{conn_id}/schema", {
+            result = await _api_post(ctx, f"/v1/connections/{conn_id}/schema", {
                 "user_id": require_user_id(ctx),
                 "database": database,
                 "connection": build_conn_info(conn),

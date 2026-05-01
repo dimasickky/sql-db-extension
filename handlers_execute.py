@@ -65,7 +65,8 @@ def _first_word(sql: str) -> str:
 
 
 @chat.function(
-    "execute_sql", action_type="destructive", event="sql.executed",
+    "execute_sql", action_type="destructive", chain_callable=True,
+    effects=["execute:sql"], event="sql.executed",
     description=(
         "Execute a write statement (INSERT, UPDATE, DELETE, REPLACE, ALTER, "
         "CREATE, DROP, TRUNCATE). Use this for all database mutations "
@@ -132,7 +133,7 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
                 f"No connection resolved (connection_id='{params.connection_id}')."
             )
 
-        result = await _api_post(f"/v1/connections/{conn_id}/execute", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/execute", {
             "user_id": require_user_id(ctx),
             "sql": sql,
             "confirmed": True,
@@ -205,7 +206,8 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
 
 
 @chat.function(
-    "run_editor_sql", action_type="write", event="sql.executed",
+    "run_editor_sql", action_type="write", chain_callable=True,
+    effects=["execute:sql"], event="sql.executed",
     description="Run any SQL from the editor. Auto-detects: SELECT goes to query, DML/DDL goes to execute.",
 )
 async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
@@ -226,7 +228,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
             inner_sql = sql[len("EXPLAIN"):].strip()
             if not inner_sql:
                 return ActionResult.error("EXPLAIN requires a query after it.")
-            result = await _api_post(f"/v1/connections/{conn_id}/explain", {
+            result = await _api_post(ctx, f"/v1/connections/{conn_id}/explain", {
                 "user_id": require_user_id(ctx),
                 "sql": inner_sql,
                 "connection": build_conn_info(conn),
@@ -239,7 +241,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
             )
 
         if is_read:
-            result = await _api_post(f"/v1/connections/{conn_id}/query", {
+            result = await _api_post(ctx, f"/v1/connections/{conn_id}/query", {
                 "user_id": require_user_id(ctx),
                 "sql": sql,
                 "limit": 100,
@@ -258,7 +260,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
             )
 
         # DML/DDL
-        result = await _api_post(f"/v1/connections/{conn_id}/execute", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/execute", {
             "user_id": require_user_id(ctx),
             "sql": sql,
             "confirmed": True,

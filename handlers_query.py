@@ -115,7 +115,7 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
         if not conn:
             return ActionResult.error("No active connection. Use add_connection first.")
 
-        result = await _api_post(f"/v1/connections/{conn_id}/query", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/query", {
             "user_id": require_user_id(ctx),
             "sql": sql,
             "limit": params.limit,
@@ -153,7 +153,7 @@ async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
         if not database:
             return ActionResult.error("No database specified. Provide database name.")
 
-        result = await _api_post(f"/v1/connections/{conn_id}/schema", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/schema", {
             "user_id": require_user_id(ctx),
             "database": database,
             "connection": build_conn_info(conn),
@@ -202,7 +202,7 @@ async def fn_explain_query(ctx, params: ExplainParams) -> ActionResult:
         if not conn:
             return ActionResult.error("No active connection.")
 
-        result = await _api_post(f"/v1/connections/{conn_id}/explain", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/explain", {
             "user_id": require_user_id(ctx),
             "sql": params.sql,
             "connection": build_conn_info(conn),
@@ -227,7 +227,7 @@ async def fn_dry_run(ctx, params: DryRunParams) -> ActionResult:
         if not conn:
             return ActionResult.error("No active connection.")
 
-        result = await _api_post(f"/v1/connections/{conn_id}/dry_run", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/dry_run", {
             "user_id": require_user_id(ctx),
             "sql": params.sql,
             "connection": build_conn_info(conn),
