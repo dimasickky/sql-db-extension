@@ -10,10 +10,11 @@ from app import _api_get
 log = logging.getLogger("sql-db")
 
 
-async def append_history(children: list, uid: str, conn_id: str) -> None:
+async def append_history(children: list, ctx, uid: str, conn_id: str) -> None:
     """History tab — recent queries table."""
     try:
         result = await _api_get(
+            ctx,
             f"/v1/connections/{conn_id}/history",
             {"user_id": uid, "limit": 30},
         )
@@ -48,10 +49,11 @@ async def append_history(children: list, uid: str, conn_id: str) -> None:
     children.append(ui.DataTable(columns=columns, rows=rows))
 
 
-async def append_saved(children: list, uid: str, conn_id: str) -> None:
+async def append_saved(children: list, ctx, uid: str, conn_id: str) -> None:
     """Saved queries tab — click an item to load+run in editor."""
     try:
         result = await _api_get(
+            ctx,
             f"/v1/connections/{conn_id}/saved",
             {"user_id": uid},
         )

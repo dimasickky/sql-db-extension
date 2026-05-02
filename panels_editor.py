@@ -196,7 +196,7 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
                 ),
             ))
     elif tab == "history":
-        await append_history(children, uid, conn_id)
+        await append_history(children, ctx, uid, conn_id)
         children.append(ui.Divider())
         children.append(ui.Button(
             "Open Editor", icon="Code", variant="primary", size="sm",
@@ -206,7 +206,7 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
             ),
         ))
     elif tab == "saved":
-        await append_saved(children, uid, conn_id)
+        await append_saved(children, ctx, uid, conn_id)
         children.append(ui.Divider())
         children.append(ui.Button(
             "Open Editor", icon="Code", variant="primary", size="sm",
