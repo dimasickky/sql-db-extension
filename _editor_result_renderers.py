@@ -41,7 +41,7 @@ def strip_trailing_limit(sql: str) -> str:
 
 
 async def fetch_pk_column(
-    uid: str, conn_id: str, conn_data: dict, table: str,
+    ctx, uid: str, conn_id: str, conn_data: dict, table: str,
 ) -> str:
     """Return the primary key column name for `table` (first PRI column), or ''.
 
@@ -50,7 +50,7 @@ async def fetch_pk_column(
     """
     database = conn_data.get("database", "")
     try:
-        schema_res = await _api_post(f"/v1/connections/{conn_id}/schema", {
+        schema_res = await _api_post(ctx, f"/v1/connections/{conn_id}/schema", {
             "user_id": uid, "database": database,
             "connection": build_conn_info(conn_data),
         })
@@ -66,11 +66,11 @@ async def fetch_pk_column(
 
 
 async def fetch_total_rows(
-    uid: str, conn_id: str, conn_data: dict, table: str,
+    ctx, uid: str, conn_id: str, conn_data: dict, table: str,
 ) -> int:
     """Run SELECT COUNT(*) for pagination total; return -1 on failure."""
     try:
-        result = await _api_post(f"/v1/connections/{conn_id}/query", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/query", {
             "user_id": uid,
             "sql": f"SELECT COUNT(*) AS cnt FROM `{table}`",
             "limit": 1,

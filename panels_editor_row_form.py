@@ -37,7 +37,7 @@ async def append_row_form(
 
     # ── Fetch schema to know columns + PK ─────────────────────────────
     try:
-        schema_res = await _api_post(f"/v1/connections/{conn_id}/schema", {
+        schema_res = await _api_post(ctx, f"/v1/connections/{conn_id}/schema", {
             "user_id": uid, "database": database, "connection": conn_info,
         })
     except Exception as e:
@@ -86,7 +86,7 @@ async def append_row_form(
             safe_value = pk_value.replace("'", "''")
             query_sql = (f"SELECT * FROM `{table}` "
                          f"WHERE `{effective_pk}` = '{safe_value}' LIMIT 1")
-            query_res = await _api_post(f"/v1/connections/{conn_id}/query", {
+            query_res = await _api_post(ctx, f"/v1/connections/{conn_id}/query", {
                 "user_id": uid, "sql": query_sql, "limit": 1,
                 "connection": conn_info,
             })
