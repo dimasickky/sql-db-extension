@@ -40,13 +40,13 @@ async def _pulse_sql_executed(ctx) -> None:
 
 
 async def _run_explain(
-    children: list, uid: str, conn_id: str, conn_info: dict,
+    children: list, ctx, uid: str, conn_id: str, conn_info: dict,
     sql_clean: str, is_explain: bool,
 ) -> None:
     """EXPLAIN path — own-function block."""
     inner_sql = sql_clean[len("EXPLAIN"):].strip() if is_explain else sql_clean
     try:
-        result = await _api_post(f"/v1/connections/{conn_id}/explain", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/explain", {
             "user_id": uid, "sql": inner_sql, "connection": conn_info,
         })
     except Exception as e:
@@ -72,7 +72,7 @@ async def _run_explain(
 
 
 async def _run_dry_run(
-    children: list, uid: str, conn_id: str, conn_info: dict,
+    children: list, ctx, uid: str, conn_id: str, conn_info: dict,
     sql_clean: str, first_word: str, is_read: bool,
 ) -> None:
     """Dry-run path — wraps backend /dry_run."""
@@ -84,7 +84,7 @@ async def _run_dry_run(
         ))
         return
     try:
-        result = await _api_post(f"/v1/connections/{conn_id}/dry_run", {
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/dry_run", {
             "user_id": uid, "sql": sql_clean, "connection": conn_info,
         })
     except Exception as e:
@@ -122,11 +122,11 @@ async def run_and_show(
     conn_info = build_conn_info(conn_data)
 
     if action == "explain":
-        await _run_explain(children, uid, conn_id, conn_info, sql_clean, is_explain)
+        await _run_explain(children, ctx, uid, conn_id, conn_info, sql_clean, is_explain)
         return
 
     if action == "dry_run":
-        await _run_dry_run(children, uid, conn_id, conn_info, sql_clean, first_word, is_read)
+        await _run_dry_run(children, ctx, uid, conn_id, conn_info, sql_clean, first_word, is_read)
         return
 
     # ── Browse detection + pagination prep ────────────────────────────
@@ -139,26 +139,26 @@ async def run_and_show(
     if paginate and table:
         base_sql = strip_trailing_limit(sql_clean)
         sql_to_run = f"{base_sql} LIMIT {page_size} OFFSET {page * page_size}"
-        total_rows = await fetch_total_rows(uid, conn_id, conn_data, table)
+        total_rows = await fetch_total_rows(ctx, uid, conn_id, conn_data, table)
         paging_on = True
 
     # ── RUN mode with inline self-repair (read↔write retry) ──────────
     async def _call_query():
-        return await _api_post(f"/v1/connections/{conn_id}/query", {
+        return await _api_post(ctx, f"/v1/connections/{conn_id}/query", {
             "user_id": uid, "sql": sql_to_run,
             "limit": page_size if paging_on else 200,
             "connection": conn_info,
         })
 
     async def _call_execute():
-        return await _api_post(f"/v1/connections/{conn_id}/execute", {
+        return await _api_post(ctx, f"/v1/connections/{conn_id}/execute", {
             "user_id": uid, "sql": sql_clean, "confirmed": True,
             "connection": conn_info,
         })
 
     try:
         if is_explain:
-            await _run_explain(children, uid, conn_id, conn_info, sql_clean, True)
+            await _run_explain(children, ctx, uid, conn_id, conn_info, sql_clean, True)
             return
         elif is_read:
             result = await _call_query()
@@ -203,7 +203,7 @@ async def run_and_show(
             type="success" if page_rows > 0 else "info",
         ))
 
-        pk_col = await fetch_pk_column(uid, conn_id, conn_data, table) if table else ""
+        pk_col = await fetch_pk_column(ctx, uid, conn_id, conn_data, table) if table else ""
         render_select_result(children, conn_id, table, pk_col, columns, raw_rows)
 
         if paging_on:
