@@ -103,7 +103,8 @@ async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
 
 
 @chat.function(
-    "save_query", action_type="write", chain_callable=True, effects=["create:saved_query"], event="query.saved",
+    "save_query", action_type="write", chain_callable=True, id_projection="connection_id",
+    effects=["create:saved_query"], event="query.saved",
     description="Save a query for later use.",
 )
 async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
@@ -202,7 +203,8 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
 
 
 @chat.function(
-    "delete_saved", action_type="destructive", chain_callable=True, effects=["delete:saved_query"], event="query.deleted",
+    "delete_saved", action_type="destructive", chain_callable=True, id_projection="query_id",
+    effects=["delete:saved_query"], event="query.deleted",
     description="Delete a saved query.",
 )
 async def fn_delete_saved(ctx, params: DeleteSavedParams) -> ActionResult:
