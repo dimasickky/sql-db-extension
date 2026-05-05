@@ -124,7 +124,7 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(result.get("detail", "Query failed"))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Query failed")))
 
         return ActionResult.success(
             data={
