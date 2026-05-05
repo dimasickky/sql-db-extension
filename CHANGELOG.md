@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.1.0] — 2026-05-05
+
+### Changed
+
+- **SDK upgraded to `imperal-sdk==4.1.2`** — picks up Pydantic feedback-loop (4.1.0), narration schema tightening (4.1.1), and `id_projection` chain dispatch (4.1.2).
+- **`id_projection` added to compound-named chain functions** in `handlers_history.py`:
+  - `save_query` → `id_projection="connection_id"` (heuristic: `query_id` ✗)
+  - `delete_saved` → `id_projection="query_id"` (heuristic: `saved_id` ✗ — field is `query_id`)
+
+---
+
 ## [1.5.8] — 2026-04-30 — SDK 3.5.0 pin + nl_to_sql import fix
 
 ### Changed

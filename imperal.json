@@ -1,7 +1,7 @@
 {
   "manifest_schema_version": 3,
   "app_id": "sql-db",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -61,6 +61,7 @@
       "effects": [
         "create:connection"
       ],
+      "id_projection": "",
       "params_schema": {
         "description": "Add a new database connection.",
         "properties": {
@@ -117,6 +118,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "Empty params model for @chat.function handlers with no business inputs (V17).",
         "properties": {},
@@ -134,6 +136,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "Resolve a connection by database or connection name.",
         "properties": {
@@ -160,6 +163,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "Target a specific connection.",
         "properties": {
@@ -188,6 +192,7 @@
       "effects": [
         "update:connection"
       ],
+      "id_projection": "",
       "params_schema": {
         "description": "Switch active connection.",
         "properties": {
@@ -216,6 +221,7 @@
       "effects": [
         "delete:connection"
       ],
+      "id_projection": "",
       "params_schema": {
         "description": "Target a specific connection.",
         "properties": {
@@ -242,6 +248,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "Run a SELECT query.",
         "properties": {
@@ -280,6 +287,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "Get database schema.",
         "properties": {
@@ -310,6 +318,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "Explain a query.",
         "properties": {
@@ -342,6 +351,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "Dry-run a DML statement.",
         "properties": {
@@ -376,6 +386,7 @@
       "effects": [
         "execute:sql"
       ],
+      "id_projection": "",
       "params_schema": {
         "description": "Execute a DML/DDL statement.",
         "properties": {
@@ -410,6 +421,7 @@
       "effects": [
         "execute:sql"
       ],
+      "id_projection": "",
       "params_schema": {
         "description": "Run any SQL from the editor — auto-detects type.",
         "properties": {
@@ -442,6 +454,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "Convert natural language question to SQL.",
         "properties": {
@@ -474,6 +487,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "List query history.",
         "properties": {
@@ -506,6 +520,7 @@
       "effects": [
         "create:saved_query"
       ],
+      "id_projection": "connection_id",
       "params_schema": {
         "description": "Save a query.",
         "properties": {
@@ -550,6 +565,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "List saved queries.",
         "properties": {
@@ -574,6 +590,7 @@
       "action_type": "read",
       "chain_callable": false,
       "effects": [],
+      "id_projection": "",
       "params_schema": {
         "description": "Run a saved query.",
         "properties": {
@@ -608,6 +625,7 @@
       "effects": [
         "delete:saved_query"
       ],
+      "id_projection": "query_id",
       "params_schema": {
         "description": "Delete a saved query.",
         "properties": {
@@ -642,6 +660,7 @@
       "effects": [
         "execute:sql"
       ],
+      "id_projection": "",
       "params_schema": {
         "description": "Side-channel to make the kernel publish `sql-db.sql.executed`.\n\nCalled via `ctx.extensions.call(...)` from panel handlers that ran DML\nthrough `/execute` or `/row` directly — those bypass @chat.function, so\nthe kernel has no way to emit the event automatically. This tiny\nwrite-typed function gives it a hook.",
         "properties": {
@@ -668,6 +687,7 @@
       "effects": [
         "create:row"
       ],
+      "id_projection": "",
       "params_schema": {
         "description": "Insert a new row into a table.",
         "properties": {
@@ -708,6 +728,7 @@
       "effects": [
         "update:row"
       ],
+      "id_projection": "",
       "params_schema": {
         "description": "Update a single row by primary key.",
         "properties": {
@@ -760,6 +781,7 @@
       "effects": [
         "delete:row"
       ],
+      "id_projection": "",
       "params_schema": {
         "description": "Delete a single row by primary key.",
         "properties": {
