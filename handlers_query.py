@@ -9,6 +9,7 @@ from app import (
     chat, ActionResult, _api_post, require_user_id,
     resolve_connection, get_connection_by_id, build_conn_info,
     DbSchemaSnapshot, SCHEMA_CACHE_KEY, SCHEMA_CACHE_TTL,
+    _translate_db_error,
 )
 
 log = logging.getLogger("sql-db")

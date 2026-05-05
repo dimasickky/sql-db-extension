@@ -11,7 +11,7 @@ import logging
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-from app import chat, ActionResult, _api_post, require_user_id, build_conn_info
+from app import chat, ActionResult, _api_post, require_user_id, build_conn_info, _translate_db_error
 from handlers_query import _resolve as _query_resolve
 from schema_guard import (
     load_schema_section,
@@ -189,7 +189,7 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(result.get("detail", "Insert failed"))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Insert failed")))
 
         affected = int(result.get("rows_affected", 0) or 0)
         await _bump_sidebar_for_dml(
@@ -245,7 +245,7 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(result.get("detail", "Update failed"))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Update failed")))
 
         affected = int(result.get("rows_affected", 0) or 0)
         await _bump_sidebar_for_dml(
@@ -291,7 +291,7 @@ async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(result.get("detail", "Delete failed"))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Delete failed")))
 
         affected = int(result.get("rows_affected", 0) or 0)
         await _bump_sidebar_for_dml(
