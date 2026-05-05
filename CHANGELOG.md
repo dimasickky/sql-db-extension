@@ -17,6 +17,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - **`handlers_rows.py`** — `insert_row`, `update_row`, `delete_row` pass backend errors through `_translate_db_error`. E.g. FK 1451 on `delete_row` now reads "Cannot delete: this record is referenced by 'orders'. Remove or reassign the related records there first." instead of raw MySQL tuple.
 - **`handlers_execute.py`** — `execute_sql` and `run_editor_sql` errors translated.
 - **`handlers_query.py`** — `run_query` syntax errors (1064) translated.
+- **`handlers_execute.py`** — EXPLAIN and SELECT branches in `run_editor_sql` also translated (missed in initial pass).
 
 ---
 
