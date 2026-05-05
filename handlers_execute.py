@@ -234,7 +234,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
                 "connection": build_conn_info(conn),
             })
             if result.get("status") != "ok":
-                return ActionResult.error(result.get("detail", "EXPLAIN failed"))
+                return ActionResult.error(_translate_db_error(result.get("detail", "EXPLAIN failed")))
             return ActionResult.success(
                 data={"plan": result.get("plan", []), "sql": inner_sql},
                 summary="EXPLAIN plan",
@@ -248,7 +248,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
                 "connection": build_conn_info(conn),
             })
             if result.get("status") != "ok":
-                return ActionResult.error(result.get("detail", "Query failed"))
+                return ActionResult.error(_translate_db_error(result.get("detail", "Query failed")))
             return ActionResult.success(
                 data={
                     "columns": result.get("columns", []),
