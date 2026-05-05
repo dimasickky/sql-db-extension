@@ -6,6 +6,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.2.0] — 2026-05-05
+
+### Added
+
+- **`_translate_db_error` in `app.py`** — translates raw MySQL error tuples `(NNNN, 'text')` into human-readable messages for codes 1062 (duplicate key), 1064 (syntax error), 1054 (unknown column), 1146 (table not found), 1451 (FK delete violation), 1452 (FK insert violation), 1406 (data too long).
+
+### Changed
+
+- **`handlers_rows.py`** — `insert_row`, `update_row`, `delete_row` pass backend errors through `_translate_db_error`. E.g. FK 1451 on `delete_row` now reads "Cannot delete: this record is referenced by 'orders'. Remove or reassign the related records there first." instead of raw MySQL tuple.
+- **`handlers_execute.py`** — `execute_sql` and `run_editor_sql` errors translated.
+- **`handlers_query.py`** — `run_query` syntax errors (1064) translated.
+
+---
+
 ## [2.1.0] — 2026-05-05
 
 ### Changed

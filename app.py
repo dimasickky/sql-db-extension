@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re as _re
 
 from imperal_sdk import Extension
 from imperal_sdk.chat import ChatExtension, ActionResult  # noqa: F401 — re-exported
@@ -36,6 +37,57 @@ def _get_fernet():
 
 def encrypt_password(plaintext: str) -> str:
     return _get_fernet().encrypt(plaintext.encode()).decode()
+
+
+# ─── MySQL error translator ───────────────────────────────────────────────── #
+
+_MYSQL_CODE_RE = _re.compile(r'^\((\d{4}),\s*[\'"]')
+
+
+def _translate_db_error(detail: str) -> str:
+    """Translate a raw MySQL error string to a human-readable message.
+
+    Parses the (NNNN, 'text') tuple format returned by aiomysql/pymysql
+    and maps the most common error codes to actionable messages.
+    Falls back to the original string when the format is unrecognised.
+    """
+    if not detail:
+        return detail
+    m = _MYSQL_CODE_RE.match(detail.strip())
+    if not m:
+        return detail
+    code = int(m.group(1))
+
+    if code == 1451:
+        ref = _re.search(r'REFERENCES\s+`?(\w+)`?', detail)
+        ref_table = ref.group(1) if ref else "a related table"
+        return (
+            f"Cannot delete: this record is referenced by '{ref_table}'. "
+            f"Remove or reassign the related records there first."
+        )
+    if code == 1452:
+        ref = _re.search(r'REFERENCES\s+`?(\w+)`?', detail)
+        ref_table = ref.group(1) if ref else "a related table"
+        return f"Cannot insert/update: the referenced record does not exist in '{ref_table}'."
+    if code == 1062:
+        m2 = _re.search(r"Duplicate entry '([^']+)' for key '([^']+)'", detail)
+        if m2:
+            return f"Duplicate value '{m2.group(1)}' — violates unique constraint on '{m2.group(2)}'."
+        return "Duplicate value: a record with this key already exists."
+    if code == 1054:
+        m2 = _re.search(r"Unknown column '([^']+)'", detail)
+        col = m2.group(1) if m2 else "unknown"
+        return f"Unknown column '{col}'. Call get_schema() to check the available columns."
+    if code == 1064:
+        return "SQL syntax error — check the query and try again."
+    if code == 1146:
+        m2 = _re.search(r"Table '([^']+)' doesn't exist", detail)
+        tbl = m2.group(1) if m2 else "unknown"
+        return f"Table '{tbl}' does not exist. Call get_schema() to see available tables."
+    if code == 1406:
+        return "Data too long for one of the columns."
+
+    return detail
 
 
 # ─── HTTP helpers (ctx-scoped, per-request, no shared state) ──────────────── #
@@ -241,7 +293,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "sql-db",
-    version="2.1.0",
+    version="2.2.0",
     capabilities=["sql-db:read", "sql-db:write"],
     display_name="SQL Database",
     description=(

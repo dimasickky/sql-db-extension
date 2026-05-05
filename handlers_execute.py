@@ -7,7 +7,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 log = logging.getLogger("sql-db")
 
-from app import chat, ActionResult, _api_post, require_user_id, build_conn_info
+from app import chat, ActionResult, _api_post, require_user_id, build_conn_info, _translate_db_error
 from handlers_query import _resolve, RunQueryParams, ExplainParams  # noqa: F401
 from schema_guard import (
     load_schema_section,
@@ -141,7 +141,7 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(result.get("detail", "Execution failed"))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Execution failed")))
 
         rows_affected = int(result.get("rows_affected", 0) or 0)
         query_type = (result.get("query_type") or "").upper()
@@ -267,7 +267,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
             "connection": build_conn_info(conn),
         })
         if result.get("status") != "ok":
-            return ActionResult.error(result.get("detail", "Execution failed"))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Execution failed")))
 
         # Phase 2 sidebar liveness — classify the executed statement, then:
         #   - mutate ctx.cache HERE inline (we have the live ctx; the
