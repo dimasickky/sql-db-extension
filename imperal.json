@@ -1,7 +1,7 @@
 {
   "manifest_schema_version": 3,
   "app_id": "sql-db",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",

@@ -8,6 +8,7 @@ from app import (
     encrypt_password, build_conn_info,
     CONN_COLLECTION, get_active_connection, get_connection_by_id,
 )
+from schema_guard import invalidate as invalidate_schema_cache
 
 
 # ─── Models ───────────────────────────────────────────────────────────────── #
@@ -254,6 +255,8 @@ async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionRes
             is_target = doc.id == params.connection_id
             if doc.data.get("is_active") != is_target:
                 await ctx.store.update(CONN_COLLECTION, doc.id, {**doc.data, "is_active": is_target})
+        # Invalidate schema cache so the next write validates against the new connection.
+        await invalidate_schema_cache(ctx)
         return ActionResult.success(
             data={"connection_id": params.connection_id, "name": target.get("name", "")},
             summary=f"Switched to {target.get('name', params.connection_id)}",
@@ -276,7 +279,7 @@ async def fn_delete_connection(ctx, params: ConnectionIdParams) -> ActionResult:
         conn = await get_connection_by_id(ctx, params.connection_id)
         if not conn:
             return ActionResult.error("Connection not found")
-        if conn.get("user_id") and conn.get("user_id") != uid:
+        if conn.get("user_id", "") != uid:
             return ActionResult.error("Connection not found")
         await ctx.store.delete(CONN_COLLECTION, params.connection_id)
         return ActionResult.success(

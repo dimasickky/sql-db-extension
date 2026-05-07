@@ -87,7 +87,7 @@ def _build_schema_description(schema_data: dict) -> str:
     db = schema_data.get("database", "")
     lines.append(f"Database: {db}")
 
-    for table in schema_data.get("tables", [])[:30]:
+    for table in schema_data.get("tables", [])[:50]:
         cols = []
         for c in table.get("columns", []):
             name = c.get("COLUMN_NAME", c.get("name", ""))
