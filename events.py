@@ -63,7 +63,7 @@ async def patch_cache_on_dml(
         return
     key = cache_key_tables_page(conn_id, database, "", 0, SIDEBAR_PAGE_LIMIT)
     try:
-        page = await ctx.cache.get(TablesPageCache, key)
+        page = await ctx.cache.get(key, model=TablesPageCache)
     except Exception:
         page = None
     if page is None:

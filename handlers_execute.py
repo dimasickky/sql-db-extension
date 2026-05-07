@@ -269,6 +269,14 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
         if result.get("status") != "ok":
             return ActionResult.error(_translate_db_error(result.get("detail", "Execution failed")))
 
+        rows_affected_editor = int(result.get("rows_affected", 0) or 0)
+        query_type_editor = (result.get("query_type") or first_word).upper()
+        if rows_affected_editor == 0 and query_type_editor in _WRITE_VERBS_AFFECTING_ROWS:
+            return ActionResult.error(
+                f"{query_type_editor} executed but 0 rows affected — "
+                "check VALUES list or WHERE clause"
+            )
+
         # Phase 2 sidebar liveness — classify the executed statement, then:
         #   - mutate ctx.cache HERE inline (we have the live ctx; the
         #     kernel's @ext.on_event dispatch passes ctx=None so cache
@@ -296,23 +304,23 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
             elif klass == "dml" and target:
                 await patch_cache_on_dml(
                     ctx, conn_id=conn_id, database=database, table=target,
-                    kind=subkind, row_delta=affected,
+                    kind=subkind, row_delta=rows_affected_editor,
                 )
                 await ctx.events.emit("table.touched", {
                     "conn_id": conn_id, "database": database,
-                    "table": target, "kind": subkind, "row_delta": affected,
+                    "table": target, "kind": subkind, "row_delta": rows_affected_editor,
                 })
         except Exception as exc:
             log.warning("sidebar liveness step failed (non-fatal): %s", exc)
 
         return ActionResult.success(
             data={
-                "rows_affected": result.get("rows_affected", 0),
+                "rows_affected": rows_affected_editor,
                 "query_type": result.get("query_type", first_word),
                 "tables": result.get("tables", []),
                 "exec_ms": result.get("exec_ms", 0),
             },
-            summary=f"{first_word} — {result.get('rows_affected', 0)} row(s) affected",
+            summary=f"{first_word} — {rows_affected_editor} row(s) affected",
         )
     except Exception as e:
         return ActionResult.error(str(e))

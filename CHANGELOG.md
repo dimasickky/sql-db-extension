@@ -6,6 +6,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.3.0] — 2026-05-07
+
+### Fixed
+
+- **[P0] Schema cap 50 tables removed** — `skeleton.py` and `fn_get_schema` previously truncated the schema mirror to the first 50 tables. Databases with >50 tables (WHMCS, large production DBs) got spurious "Unknown table" errors on tables 51+. Cap removed; all tables now cached.
+- **[P0] Schema cache invalidated on connection switch** — `fn_select_connection` now calls `invalidate_schema_cache(ctx)` after switching. Previously, switching from connection A to B kept A's schema in `"schema:active"` for up to 5 minutes, causing write-time validators to reject valid tables/columns on the new connection.
+- **[P1] `events.py` `patch_cache_on_dml` — `cache.get` argument order fixed** — args were reversed (`cache.get(ModelClass, key)` instead of `cache.get(key, model=ModelClass)`). Every call raised an exception that was silently caught, making `patch_cache_on_dml` a no-op since v2.0.0. Optimistic row-count delta and `"just now"` sidebar badge now work correctly.
+- **[P1] `fn_run_editor_sql` — zero-row DML fail added** — `UPDATE`/`DELETE`/`INSERT`/`REPLACE` that affects 0 rows now returns `ActionResult.error(...)` from the editor panel, consistent with `fn_execute_sql` (chat path). Previously the panel showed `"UPDATE — 0 row(s) affected"` as success.
+- **[P1] `fn_delete_connection` — stricter ownership check** — changed `if conn.get("user_id") and conn.get("user_id") != uid` to `if conn.get("user_id", "") != uid`. The old form skipped the check when `user_id` was absent from the document.
+
+### Changed
+
+- **SDK bumped `4.1.2 → 4.1.3`** — pure refactor release (`chat/handler.py` split), no API or behavioral changes.
+- **`fn_run_editor_sql` sidebar liveness** — DML row_delta and summary now use `rows_affected_editor` variable consistently through the sidebar liveness block and ActionResult (was using stale `result.get("rows_affected")` after introducing the new variable).
+- **`nl_to_sql` schema context cap `30 → 50` tables** — `_build_schema_description` now includes up to 50 tables in the LLM prompt, consistent with the schema cache no longer being truncated.
+
+---
+
 ## [2.2.0] — 2026-05-05
 
 ### Added

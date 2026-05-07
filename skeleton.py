@@ -57,7 +57,7 @@ async def skeleton_refresh_db_schema(ctx) -> dict:
 
         tables = result.get("tables", [])
         compact_tables = []
-        for t in tables[:50]:
+        for t in tables:
             cols = [
                 {"name": c.get("COLUMN_NAME", ""), "type": c.get("COLUMN_TYPE", ""),
                  "key": c.get("COLUMN_KEY", "")}
