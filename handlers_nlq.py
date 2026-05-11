@@ -1,9 +1,12 @@
 """sql-db · Natural language to SQL handler."""
-from __future__ import annotations
+
+import logging
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import chat, ActionResult, _api_post, require_user_id, get_active_connection, build_conn_info
+
+log = logging.getLogger("sql-db")
 from handlers_query import _resolve
 from schema_guard import load_schema_section
 
@@ -78,7 +81,8 @@ async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
             summary=f"Generated SQL for: {params.question}",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("nl_to_sql: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 def _build_schema_description(schema_data: dict) -> str:
