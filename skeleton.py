@@ -80,3 +80,32 @@ async def skeleton_refresh_db_schema(ctx) -> dict:
         }}
 
 
+@ext.tool(
+    "skeleton_alert_db_schema",
+    description="Alert on database schema changes — tables added or removed.",
+)
+async def skeleton_alert_db_schema(
+    ctx,
+    old: dict | None = None,
+    new: dict | None = None,
+) -> dict:
+    """Called by kernel when db_schema snapshot changes between ticks."""
+    if not old or not new:
+        return {"response": ""}
+
+    old_tables = {t["name"] for t in old.get("tables", [])}
+    new_tables = {t["name"] for t in new.get("tables", [])}
+    added   = new_tables - old_tables
+    removed = old_tables - new_tables
+
+    if not added and not removed:
+        return {"response": ""}
+
+    parts = []
+    if added:
+        parts.append(f"New tables: {', '.join(sorted(added))}")
+    if removed:
+        parts.append(f"Removed tables: {', '.join(sorted(removed))}")
+
+    return {"response": f"Schema changed — {'; '.join(parts)}"}
+
