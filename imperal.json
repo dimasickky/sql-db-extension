@@ -33,27 +33,6 @@
       "parameters": {}
     },
     {
-      "name": "skeleton_alert_db_schema",
-      "description": "Alert on schema changes (tables added or removed).",
-      "scopes": [
-        "sql-db.read"
-      ],
-      "parameters": {
-        "old": {
-          "type": "string",
-          "required": false
-        },
-        "new": {
-          "type": "string",
-          "required": false
-        },
-        "kwargs": {
-          "type": "string",
-          "required": true
-        }
-      }
-    },
-    {
       "name": "add_connection",
       "description": "Add a new MySQL/MariaDB connection. Tests connectivity before saving.",
       "action_type": "write",
@@ -823,9 +802,7 @@
   ],
   "signals": [],
   "schedules": [],
-  "required_scopes": [
-    "sql-db.read"
-  ],
+  "required_scopes": [],
   "icon_size_bytes": 296,
   "lifecycle": {
     "on_install": true,
