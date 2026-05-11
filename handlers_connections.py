@@ -1,5 +1,6 @@
 """sql-db · Connection CRUD handlers."""
-from __future__ import annotations
+
+import logging
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
@@ -9,6 +10,8 @@ from app import (
     CONN_COLLECTION, get_active_connection, get_connection_by_id,
 )
 from schema_guard import invalidate as invalidate_schema_cache
+
+log = logging.getLogger("sql-db")
 
 
 # ─── Models ───────────────────────────────────────────────────────────────── #
@@ -135,7 +138,8 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
             summary=f"Connected to {params.host} ({result.get('version', '')})",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("add_connection: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -160,7 +164,8 @@ async def fn_list_connections(ctx, params: NoParams) -> ActionResult:
             summary=f"Found {len(connections)} connection(s)",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("list_connections: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -210,7 +215,8 @@ async def fn_resolve_connection_by_database(
             summary=f"connection_id={exact.id} for {target}",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("resolve_connection_by_database: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -233,7 +239,8 @@ async def fn_test_connection(ctx, params: ConnectionIdParams) -> ActionResult:
             )
         return ActionResult.error(result.get("error", "Connection failed"))
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("test_connection: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -262,7 +269,8 @@ async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionRes
             summary=f"Switched to {target.get('name', params.connection_id)}",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("select_connection: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -287,4 +295,5 @@ async def fn_delete_connection(ctx, params: ConnectionIdParams) -> ActionResult:
             summary=f"Connection '{conn.get('name', '')}' deleted",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("delete_connection: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)

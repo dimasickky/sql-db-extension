@@ -4,7 +4,6 @@ All three call the parameterized backend endpoint `/v1/connections/{id}/row` —
 values are NEVER interpolated into SQL on the client. Backend uses aiomysql
 parameterized queries for safe escaping.
 """
-from __future__ import annotations
 
 import json as _json
 import logging
@@ -143,8 +142,8 @@ def _parse_values(values_json: str) -> tuple[dict, str | None]:
         if not isinstance(data, dict):
             return {}, "values_json must be a JSON object"
         return data, None
-    except _json.JSONDecodeError as e:
-        return {}, f"Invalid JSON: {e}"
+    except _json.JSONDecodeError:
+        return {}, "values_json must be valid JSON (e.g. {\"col\": \"value\"})"
 
 
 async def _resolve(ctx, connection_id: str = ""):
@@ -206,7 +205,8 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
             summary=f"Inserted row into {params.table}",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("insert_row: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -262,7 +262,8 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
             summary=f"Updated {affected} row(s) in {params.table}",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("update_row: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -308,4 +309,5 @@ async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
             summary=f"Deleted row from {params.table}",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("delete_row: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)

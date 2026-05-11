@@ -76,7 +76,7 @@ async def skeleton_refresh_db_schema(ctx) -> dict:
     except Exception as e:
         log.error("skeleton refresh failed: %s", e)
         return {"response": {
-            "database": "", "connection": "", "table_count": 0, "tables": [], "error": str(e),
+            "database": "", "connection": "", "table_count": 0, "tables": [],
         }}
 
 

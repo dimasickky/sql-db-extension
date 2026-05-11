@@ -1,5 +1,4 @@
 """sql-db · Query, explain, dry_run handlers."""
-from __future__ import annotations
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
@@ -136,7 +135,8 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
             summary=f"{result.get('total_rows', 0)} row(s) in {result.get('exec_ms', 0)}ms",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("run_query: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -189,7 +189,8 @@ async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
             summary=f"Database '{database}': {len(tables)} table(s)",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("get_schema: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -214,7 +215,8 @@ async def fn_explain_query(ctx, params: ExplainParams) -> ActionResult:
             summary="EXPLAIN plan for query",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("explain_query: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -244,4 +246,5 @@ async def fn_dry_run(ctx, params: DryRunParams) -> ActionResult:
             summary=f"Would affect {result.get('would_affect', 0)} row(s)",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("dry_run: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)

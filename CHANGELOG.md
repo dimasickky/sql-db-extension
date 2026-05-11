@@ -6,6 +6,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.4.0] — 2026-05-11
+
+### Changed
+
+- **SDK bumped `4.1.3 → 4.2.0`** — no behavioral changes for this extension.
+
+### Fixed
+
+- **[the platform invariant] All 21 raw exception leaks eliminated** across all handler files. Raw `str(e)` and `f"Invalid JSON: {e}"` were reaching users in violation of the platform invariant/2. All sites now `log.error(...)` internally and return a stable safe message.
+  - `handlers_connections.py` — 6 sites (add/list/resolve/test/select/delete connection)
+  - `handlers_query.py` — 4 sites (run_query, get_schema, explain_query, dry_run)
+  - `handlers_execute.py` — 2 sites (execute_sql, run_editor_sql)
+  - `handlers_rows.py` — 4 sites (insert/update/delete row + `_parse_values` JSON error)
+  - `handlers_history.py` — 5 sites (list_history, save/list/run/delete saved)
+  - `handlers_nlq.py` — 1 site (nl_to_sql)
+- **[Skeleton] `"error": str(e)` removed from degraded return in `skeleton.py`** — zero-value dict only on backend failure.
+- **[V18] `from __future__ import annotations` removed** from all 6 handler files that define Pydantic `BaseModel` param classes.
+- **[Logging] `import logging` + `log` added** to `handlers_connections.py`, `handlers_history.py`, `handlers_nlq.py`.
+- **[Backend] `the backend/routes_query.py` — 4 raw exception leaks fixed** — `/query`, `/execute`, `/explain`, `/dry_run` no longer return `f"...{e}"` in HTTP 500 detail. Error logged via `log.error(...)` (operator-visible in journald/SigNoz); `_log_query` still records full error text in `query_history` for audit. Service restarted.
+
+---
+
 ## [2.3.0] — 2026-05-07
 
 ### Fixed

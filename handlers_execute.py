@@ -1,5 +1,4 @@
 """sql-db · DML/DDL execution handler + universal editor runner."""
-from __future__ import annotations
 
 import logging
 
@@ -202,7 +201,8 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
             summary=f"{result.get('query_type', 'SQL')} — {rows_affected} row(s) affected",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("execute_sql: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
 
 
 @chat.function(
@@ -323,4 +323,5 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
             summary=f"{first_word} — {rows_affected_editor} row(s) affected",
         )
     except Exception as e:
-        return ActionResult.error(str(e))
+        log.error("run_editor_sql: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
