@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.4.1] — 2026-05-12
+
+### Changed
+
+- SDK bumped `4.2.0 → 4.2.1` — fixes a validator check false positive on `@ext.tool("skeleton_alert_*")`.
+
+---
+
 ## [2.4.0] — 2026-05-11
 
 ### Changed
