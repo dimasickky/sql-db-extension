@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.4.3] — 2026-05-13
+
+### Changed
+
+- SDK bumped `4.2.6 → 4.2.10` — picks up OAuth callback infrastructure + `ctx.webhook_url()` (4.2.7), `SecretDecl` in Manifest schema (4.2.8/4.2.9), and `chain_callable=True` default for read handlers (4.2.10). Read handlers (`get_schema`, `run_query`, `list_connections`, etc.) now dispatch typed directly — no longer routed through BYOLLM loop.
+
+---
+
 ## [2.4.2] — 2026-05-13
 
 ### Changed
