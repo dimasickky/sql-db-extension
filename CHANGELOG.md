@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.4.2] — 2026-05-13
+
+### Changed
+
+- SDK bumped `4.2.1 → 4.2.6` — picks up EXT-SECRETS-V1 (unconditional Secrets panel in right slot), validator synthetic-tool fix (4.2.5), and `ui.Password` primitive (4.2.6).
+- **New Connection form**: password field switched from `ui.Input` to `ui.Password` — input is now masked while typing.
+
+---
+
 ## [2.4.1] — 2026-05-12
 
 ### Changed

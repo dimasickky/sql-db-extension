@@ -293,7 +293,7 @@ SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
 
 ext = Extension(
     "sql-db",
-    version="2.4.1",
+    version="2.4.2",
     capabilities=["sql-db:read", "sql-db:write"],
     display_name="SQL Database",
     description=(
