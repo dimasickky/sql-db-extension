@@ -101,7 +101,7 @@ async def sql_sidebar(ctx, active_conn_id: str = "", view: str = "main", **kwarg
                 ui.Input(placeholder="Host (e.g. db.example.com)", param_name="host"),
                 ui.Input(placeholder="Port", value="3306", param_name="port"),
                 ui.Input(placeholder="Username", param_name="db_user"),
-                ui.Input(placeholder="Password", param_name="password"),
+                ui.Password(placeholder="Password", param_name="password"),
                 ui.Input(placeholder="Database name", param_name="database"),
                 ui.Stack([
                     ui.Button("Connect", icon="PlugZap", variant="primary", size="sm",
