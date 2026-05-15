@@ -283,17 +283,11 @@ def build_conn_info(conn: dict) -> dict:
     }
 
 
-# ─── System Prompt ────────────────────────────────────────────────────────── #
-
-from pathlib import Path as _Path
-SYSTEM_PROMPT = (_Path(__file__).parent / "system_prompt.txt").read_text()
-
-
 # ─── Extension ───────────────────────────────────────────────────────────── #
 
 ext = Extension(
     "sql-db",
-    version="2.4.3",
+    version="2.5.0",
     capabilities=["sql-db:read", "sql-db:write"],
     display_name="SQL Database",
     description=(
@@ -449,7 +443,6 @@ chat = ChatExtension(
         "SQL Database assistant — connect to MySQL/MariaDB databases, "
         "browse schema, run queries, explain plans, manage saved queries"
     ),
-    system_prompt=SYSTEM_PROMPT,
 )
 
 

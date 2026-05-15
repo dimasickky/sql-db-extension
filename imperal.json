@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "4.2.10",
+  "sdk_version": "5.0.0",
   "app_id": "sql-db",
-  "version": "2.4.3",
+  "version": "2.5.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -13,21 +13,6 @@
     "sql-db:write"
   ],
   "tools": [
-    {
-      "name": "tool_sql_db_chat",
-      "description": "SQL Database assistant — connect to MySQL/MariaDB databases, browse schema, run queries, explain plans, manage saved queries",
-      "scopes": [],
-      "parameters": {
-        "message": {
-          "type": "string",
-          "required": false
-        },
-        "kwargs": {
-          "type": "string",
-          "required": true
-        }
-      }
-    },
     {
       "name": "skeleton_refresh_db_schema",
       "description": "Active database schema cache — tables, columns, row counts.",
@@ -105,6 +90,8 @@
       },
       "return_schema": {},
       "event": "connection.added",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -123,6 +110,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -150,6 +139,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -177,6 +168,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -206,6 +199,8 @@
       },
       "return_schema": {},
       "event": "connection.selected",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -235,6 +230,8 @@
       },
       "return_schema": {},
       "event": "connection.deleted",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -274,6 +271,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -305,6 +304,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -338,6 +339,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -371,6 +374,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -406,6 +411,8 @@
       },
       "return_schema": {},
       "event": "sql.executed",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -441,6 +448,8 @@
       },
       "return_schema": {},
       "event": "sql.executed",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -474,6 +483,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -505,6 +516,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -552,6 +565,8 @@
       },
       "return_schema": {},
       "event": "query.saved",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -577,6 +592,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -610,6 +627,8 @@
       },
       "return_schema": {},
       "event": "",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -645,6 +664,8 @@
       },
       "return_schema": {},
       "event": "query.deleted",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -672,6 +693,8 @@
       },
       "return_schema": {},
       "event": "sql.executed",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -713,6 +736,8 @@
       },
       "return_schema": {},
       "event": "row.inserted",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -766,6 +791,8 @@
       },
       "return_schema": {},
       "event": "row.updated",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     },
@@ -813,6 +840,8 @@
       },
       "return_schema": {},
       "event": "row.deleted",
+      "background": false,
+      "long_running": false,
       "scopes": [],
       "owner_chat_tool": "tool_sql_db_chat"
     }
