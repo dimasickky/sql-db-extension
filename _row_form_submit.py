@@ -85,7 +85,7 @@ async def process_row_form_submit(
     try:
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/row", payload)
     except Exception as e:
-        children.append(ui.Alert(title="Request failed", message=str(e), type="error"))
+        children.append(ui.Alert(title="Request failed", message="Request failed. Please try again.", type="error"))
         append_back_button(children, conn_id, table)
         return
 
