@@ -41,7 +41,7 @@ async def append_row_form(
             "user_id": uid, "database": database, "connection": conn_info,
         })
     except Exception as e:
-        children.append(ui.Alert(title="Schema error", message=str(e), type="error"))
+        children.append(ui.Alert(title="Schema error", message="Request failed. Please try again.", type="error"))
         return
 
     tables = schema_res.get("tables", [])
@@ -102,7 +102,7 @@ async def append_row_form(
                 append_back_button(children, conn_id, table)
                 return
         except Exception as e:
-            children.append(ui.Alert(title="Row fetch failed", message=str(e), type="error"))
+            children.append(ui.Alert(title="Row fetch failed", message="Request failed. Please try again.", type="error"))
             return
 
     # ── Build the form ────────────────────────────────────────────────

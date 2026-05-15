@@ -50,7 +50,7 @@ async def _run_explain(
             "user_id": uid, "sql": inner_sql, "connection": conn_info,
         })
     except Exception as e:
-        children.append(ui.Alert(title="Request failed", message=str(e), type="error"))
+        children.append(ui.Alert(title="Request failed", message="Request failed. Please try again.", type="error"))
         return
 
     if result.get("status") == "error":
@@ -88,7 +88,7 @@ async def _run_dry_run(
             "user_id": uid, "sql": sql_clean, "connection": conn_info,
         })
     except Exception as e:
-        children.append(ui.Alert(title="Request failed", message=str(e), type="error"))
+        children.append(ui.Alert(title="Request failed", message="Request failed. Please try again.", type="error"))
         return
 
     if result.get("status") == "error":
@@ -173,7 +173,7 @@ async def run_and_show(
                 is_read = True
                 result = await _call_query()
     except Exception as e:
-        children.append(ui.Alert(title="Request failed", message=str(e), type="error"))
+        children.append(ui.Alert(title="Request failed", message="Request failed. Please try again.", type="error"))
         return
 
     if result.get("status") == "error":

@@ -9,7 +9,8 @@ for _m in [k for k in sys.modules if k in (
     "handlers_nlq", "handlers_history", "handlers_rows",
     "skeleton", "panels", "panels_editor",
     "panels_editor_results", "panels_editor_tabs", "panels_editor_row_form",
-    "sql_parser", "events",
+    "_editor_result_renderers", "_row_form_inputs", "_row_form_submit",
+    "schema_guard", "sql_parser", "events",
 )]:
     del sys.modules[_m]
 
