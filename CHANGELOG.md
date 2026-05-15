@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.5.0] — 2026-05-15
+
+### Changed
+
+- **SDK 5.0.0 migration** — bumped `imperal-sdk` to `5.0.0`. Removed deprecated `system_prompt=` kwarg and `SYSTEM_PROMPT` variable (no-op in 5.0.0). Manifest rebuilt — `tool_sql_db_chat` orchestrator-tool entry removed (V25 compliance, `I-LOADER-REJECTS-LEGACY-LLM-ROUTER`).
+
+---
+
 ## [2.4.3] — 2026-05-13
 
 ### Changed
