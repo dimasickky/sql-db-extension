@@ -5,6 +5,7 @@ import logging
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import chat, ActionResult, _api_post, require_user_id, get_active_connection, build_conn_info
+from models_return import *  # noqa: F401,F403 — data_model DTOs
 
 log = logging.getLogger("sql-db")
 from handlers_query import _resolve
@@ -34,6 +35,7 @@ class NlToSqlParams(BaseModel):
 @chat.function(
     "nl_to_sql", action_type="read",
     description="Convert a natural language question to SQL using the database schema.",
+    data_model=NlToSqlResult,
 )
 async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
     """Convert a natural language question to SQL using the database schema."""

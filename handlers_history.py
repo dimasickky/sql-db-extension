@@ -5,6 +5,7 @@ import logging
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import chat, ActionResult, _api_get, _api_post, _api_delete, _api_patch, require_user_id, build_conn_info
+from models_return import *  # noqa: F401,F403 — data_model DTOs
 from handlers_query import _resolve
 
 log = logging.getLogger("sql-db")
@@ -84,6 +85,7 @@ class DeleteSavedParams(BaseModel):
 @chat.function(
     "list_history", action_type="read",
     description="List recent query history for the active connection.",
+    data_model=ListHistoryResult,
 )
 async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
     try:
@@ -109,6 +111,7 @@ async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
     "save_query", action_type="write", chain_callable=True, id_projection="connection_id",
     effects=["create:saved_query"], event="query.saved",
     description="Save a query for later use.",
+    data_model=SaveQueryResult,
 )
 async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
     try:
@@ -136,6 +139,7 @@ async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
 @chat.function(
     "list_saved", action_type="read",
     description="List saved queries for the active connection.",
+    data_model=ListSavedResult,
 )
 async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
     try:
@@ -161,6 +165,7 @@ async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
 @chat.function(
     "run_saved", action_type="read",
     description="Run a previously saved query.",
+    data_model=RunSavedResult,
 )
 async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
     try:
@@ -207,6 +212,7 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
     "delete_saved", action_type="destructive", chain_callable=True, id_projection="query_id",
     effects=["delete:saved_query"], event="query.deleted",
     description="Delete a saved query.",
+    data_model=DeleteSavedResult,
 )
 async def fn_delete_saved(ctx, params: DeleteSavedParams) -> ActionResult:
     try:

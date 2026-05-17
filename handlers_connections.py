@@ -9,6 +9,8 @@ from app import (
     encrypt_password, build_conn_info,
     CONN_COLLECTION, get_active_connection, get_connection_by_id,
 )
+from models_return import *  # noqa: F401,F403 — data_model DTOs
+
 from schema_guard import invalidate as invalidate_schema_cache
 
 log = logging.getLogger("sql-db")
@@ -95,6 +97,7 @@ class ResolveConnByDbParams(BaseModel):
     effects=["create:connection"],
     event="connection.added",
     description="Add a new MySQL/MariaDB connection. Tests connectivity before saving.",
+    data_model=AddConnectionResult,
 )
 async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
     uid = require_user_id(ctx)
@@ -146,6 +149,7 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
     "list_connections",
     action_type="read",
     description="List all saved database connections with their status.",
+    data_model=ListConnectionsResult,
 )
 async def fn_list_connections(ctx, params: NoParams) -> ActionResult:
     uid = require_user_id(ctx)
@@ -177,6 +181,7 @@ async def fn_list_connections(ctx, params: NoParams) -> ActionResult:
         "e.g. resolve_connection_by_database(database_name='ijodghbk_test') "
         "-> pass the returned connection_id into the next step."
     ),
+    data_model=ResolveConnectionResult,
 )
 async def fn_resolve_connection_by_database(
     ctx, params: ResolveConnByDbParams,
@@ -223,6 +228,7 @@ async def fn_resolve_connection_by_database(
     "test_connection",
     action_type="read",
     description="Test connectivity for an existing saved connection.",
+    data_model=TestConnectionResult,
 )
 async def fn_test_connection(ctx, params: ConnectionIdParams) -> ActionResult:
     try:
@@ -250,6 +256,7 @@ async def fn_test_connection(ctx, params: ConnectionIdParams) -> ActionResult:
     effects=["update:connection"],
     event="connection.selected",
     description="Switch the active database connection.",
+    data_model=SelectConnectionResult,
 )
 async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionResult:
     uid = require_user_id(ctx)
@@ -280,6 +287,7 @@ async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionRes
     effects=["delete:connection"],
     event="connection.deleted",
     description="Delete a saved database connection permanently.",
+    data_model=DeleteConnectionResult,
 )
 async def fn_delete_connection(ctx, params: ConnectionIdParams) -> ActionResult:
     uid = require_user_id(ctx)
