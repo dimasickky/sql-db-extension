@@ -24,7 +24,7 @@ log = logging.getLogger("sql-db")
 
 
 @ext.panel("editor", slot="center", title="SQL Editor", icon="Code",
-           refresh="on_event:row.inserted,row.updated,row.deleted")
+           refresh="on_event:sql-db.row.inserted,sql-db.row.updated,sql-db.row.deleted")
 async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
                      sql: str = "", action: str = "run",
                      table: str = "", mode: str = "insert",

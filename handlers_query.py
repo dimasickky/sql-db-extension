@@ -254,3 +254,70 @@ async def fn_dry_run(ctx, params: DryRunParams) -> ActionResult:
     except Exception as e:
         log.error("dry_run: %s", e)
         return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+
+
+class CountTableParams(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    table: str = Field(
+        ...,
+        validation_alias=AliasChoices("table", "table_name"),
+        description="Table name to count rows in. Runs a real SELECT COUNT(*) — not an estimate.",
+    )
+    database: str = Field(
+        default="",
+        description="Database name. Omit to use the active connection's default database.",
+    )
+    connection_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("connection_id", "conn_id", "connection"),
+        description="Connection ID. Omit to use the active connection.",
+    )
+
+
+@chat.function(
+    "count_table",
+    action_type="read",
+    description=(
+        "Get the EXACT row count of a table via SELECT COUNT(*). "
+        "Use this when the user asks how many rows are in a table — "
+        "get_schema() returns INFORMATION_SCHEMA estimates which can be wrong. "
+        "This is the only call that returns a guaranteed-accurate row count."
+    ),
+    data_model=CountTableResult,
+)
+async def fn_count_table(ctx, params: CountTableParams) -> ActionResult:
+    try:
+        conn, conn_id = await _resolve(ctx, params.connection_id)
+        if not conn:
+            return ActionResult.error("No active connection. Use add_connection first.")
+
+        database = params.database or conn.get("database", "")
+        if not database:
+            return ActionResult.error("No database specified. Provide database name.")
+
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/tables/{params.table}/count", {
+            "user_id": require_user_id(ctx),
+            "database": database,
+            "connection": build_conn_info(conn),
+        })
+
+        if result.get("status") != "ok":
+            return ActionResult.error(
+                f"Row count failed: {result.get('error') or result.get('detail', 'unknown error')}"
+            )
+
+        count = result.get("count", 0)
+        exec_ms = result.get("exec_ms", 0)
+        return ActionResult.success(
+            summary=f"Table '{params.table}' has {count:,} rows ({exec_ms}ms).",
+            data={
+                "database": database,
+                "table":    params.table,
+                "count":    count,
+                "exec_ms":  exec_ms,
+            },
+        )
+    except Exception as e:
+        log.error("count_table: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)

@@ -54,8 +54,9 @@ log = logging.getLogger("sql-db")
 @ext.panel(
     "sidebar", slot="left", title="SQL DB", icon="Database",
     default_width=260, min_width=200, max_width=400,
-    refresh="on_event:connection.added,connection.deleted,connection.selected,"
-            "sql.ddl_executed,table.touched,schema.indexed",
+    refresh="on_event:sql-db.connection.added,sql-db.connection.deleted,"
+            "sql-db.connection.selected,sql-db.sql.ddl_executed,"
+            "sql-db.table.touched,sql-db.schema.indexed",
 )
 async def sql_sidebar(ctx, active_conn_id: str = "", view: str = "main", **kwargs):
     """Sidebar render — O(1) in target-DB size. Cache-only data path.

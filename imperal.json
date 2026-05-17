@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.0.1",
   "app_id": "sql-db",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -644,6 +644,73 @@
           "exec_ms"
         ],
         "title": "DryRunResult",
+        "type": "object"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "count_table",
+      "description": "Get the EXACT row count of a table via SELECT COUNT(*). Use this when the user asks how many rows are in a table — get_schema() returns INFORMATION_SCHEMA estimates which can be wrong. This is the only call that returns a guaranteed-accurate row count.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "table": {
+            "description": "Table name to count rows in. Runs a real SELECT COUNT(*) — not an estimate.",
+            "title": "Table",
+            "type": "string"
+          },
+          "database": {
+            "default": "",
+            "description": "Database name. Omit to use the active connection's default database.",
+            "title": "Database",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID. Omit to use the active connection.",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table"
+        ],
+        "title": "CountTableParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "properties": {
+          "database": {
+            "title": "Database",
+            "type": "string"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "exec_ms": {
+            "title": "Exec Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "database",
+          "table",
+          "count",
+          "exec_ms"
+        ],
+        "title": "CountTableResult",
         "type": "object"
       },
       "event": "",
