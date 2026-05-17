@@ -1,6 +1,4 @@
 """sql-db · Shared state & extension setup."""
-from __future__ import annotations
-
 import logging
 import os
 import re as _re
@@ -287,7 +285,7 @@ def build_conn_info(conn: dict) -> dict:
 
 ext = Extension(
     "sql-db",
-    version="2.5.0",
+    version="2.6.0",
     capabilities=["sql-db:read", "sql-db:write"],
     display_name="SQL Database",
     description=(

@@ -11,6 +11,7 @@ import logging
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app import chat, ActionResult, _api_post, require_user_id, build_conn_info, _translate_db_error
+from models_return import *  # noqa: F401,F403 — data_model DTOs
 from handlers_query import _resolve as _query_resolve
 from schema_guard import (
     load_schema_section,
@@ -59,6 +60,7 @@ class PulseParams(BaseModel):
 
 @chat.function(
     "_pulse_sql_executed", action_type="write", chain_callable=True, effects=["execute:sql"], event="sql.executed",
+    data_model=PulseSqlResult,
     description=(
         "Internal side-channel: emit sql.executed after a panel-direct DML "
         "so the sidebar schema refreshes. Do not call from chat — for "
@@ -156,6 +158,7 @@ async def _resolve(ctx, connection_id: str = ""):
 @chat.function(
     "insert_row", action_type="write", chain_callable=True, effects=["create:row"], event="row.inserted",
     description="Insert a new row into a table. Values as JSON object of column -> value.",
+    data_model=InsertRowResult,
 )
 async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
     """Insert a new row into a table. Values as JSON object of column -> value."""
@@ -212,6 +215,7 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
 @chat.function(
     "update_row", action_type="write", chain_callable=True, effects=["update:row"], event="row.updated",
     description="Update a single row identified by primary key. Changes as JSON object of column -> new value.",
+    data_model=RowMutateResult,
 )
 async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
     """Update a single row identified by primary key. Changes as JSON object of column -> new value."""
@@ -269,6 +273,7 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
 @chat.function(
     "delete_row", action_type="destructive", chain_callable=True, effects=["delete:row"], event="row.deleted",
     description="Delete a single row identified by primary key. Requires confirmation.",
+    data_model=RowMutateResult,
 )
 async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
     """Delete a single row identified by primary key. Requires confirmation."""

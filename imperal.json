@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.0.0",
+  "sdk_version": "5.0.1",
   "app_id": "sql-db",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -88,7 +88,37 @@
         "title": "AddConnectionParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "connection_id": {
+            "title": "Connection Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "databases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Databases",
+            "type": "array"
+          }
+        },
+        "required": [
+          "connection_id",
+          "name",
+          "version",
+          "databases"
+        ],
+        "title": "AddConnectionResult",
+        "type": "object"
+      },
       "event": "connection.added",
       "background": false,
       "long_running": false,
@@ -108,7 +138,67 @@
         "title": "NoParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "$defs": {
+          "ConnectionItem": {
+            "properties": {
+              "connection_id": {
+                "title": "Connection Id",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "host": {
+                "title": "Host",
+                "type": "string"
+              },
+              "database": {
+                "title": "Database",
+                "type": "string"
+              },
+              "is_active": {
+                "title": "Is Active",
+                "type": "boolean"
+              },
+              "server_version": {
+                "title": "Server Version",
+                "type": "string"
+              }
+            },
+            "required": [
+              "connection_id",
+              "name",
+              "host",
+              "database",
+              "is_active",
+              "server_version"
+            ],
+            "title": "ConnectionItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "connections": {
+            "items": {
+              "$ref": "#/$defs/ConnectionItem"
+            },
+            "title": "Connections",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "connections",
+          "total"
+        ],
+        "title": "ListConnectionsResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -137,7 +227,34 @@
         "title": "ResolveConnByDbParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "connection_id": {
+            "title": "Connection Id",
+            "type": "string"
+          },
+          "database": {
+            "title": "Database",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "host": {
+            "title": "Host",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id",
+          "database",
+          "name",
+          "host"
+        ],
+        "title": "ResolveConnectionResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -166,7 +283,34 @@
         "title": "ConnectionIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "databases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Databases",
+            "type": "array"
+          }
+        },
+        "required": [
+          "version",
+          "databases"
+        ],
+        "title": "TestConnectionResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -197,7 +341,24 @@
         "title": "SelectConnectionParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "connection_id": {
+            "title": "Connection Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id",
+          "name"
+        ],
+        "title": "SelectConnectionResult",
+        "type": "object"
+      },
       "event": "connection.selected",
       "background": false,
       "long_running": false,
@@ -228,7 +389,19 @@
         "title": "ConnectionIdParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "connection_id": {
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id"
+        ],
+        "title": "DeleteConnectionResult",
+        "type": "object"
+      },
       "event": "connection.deleted",
       "background": false,
       "long_running": false,
@@ -269,7 +442,38 @@
         "title": "RunQueryParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "rows": {
+            "items": {},
+            "title": "Rows",
+            "type": "array"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          },
+          "exec_ms": {
+            "title": "Exec Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "total_rows",
+          "exec_ms"
+        ],
+        "title": "QueryResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -302,7 +506,30 @@
         "title": "GetSchemaParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "database": {
+            "title": "Database",
+            "type": "string"
+          },
+          "tables": {
+            "items": {},
+            "title": "Tables",
+            "type": "array"
+          },
+          "table_count": {
+            "title": "Table Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "database",
+          "tables",
+          "table_count"
+        ],
+        "title": "GetSchemaResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -337,7 +564,25 @@
         "title": "ExplainParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "plan": {
+            "items": {},
+            "title": "Plan",
+            "type": "array"
+          },
+          "sql": {
+            "title": "Sql",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan",
+          "sql"
+        ],
+        "title": "ExplainResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -372,7 +617,35 @@
         "title": "DryRunParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "would_affect": {
+            "title": "Would Affect",
+            "type": "integer"
+          },
+          "query_type": {
+            "title": "Query Type",
+            "type": "string"
+          },
+          "tables": {
+            "items": {},
+            "title": "Tables",
+            "type": "array"
+          },
+          "exec_ms": {
+            "title": "Exec Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "would_affect",
+          "query_type",
+          "tables",
+          "exec_ms"
+        ],
+        "title": "DryRunResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -409,7 +682,35 @@
         "title": "ExecuteSqlParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "rows_affected": {
+            "title": "Rows Affected",
+            "type": "integer"
+          },
+          "query_type": {
+            "title": "Query Type",
+            "type": "string"
+          },
+          "tables": {
+            "items": {},
+            "title": "Tables",
+            "type": "array"
+          },
+          "exec_ms": {
+            "title": "Exec Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rows_affected",
+          "query_type",
+          "tables",
+          "exec_ms"
+        ],
+        "title": "SqlExecuteResult",
+        "type": "object"
+      },
       "event": "sql.executed",
       "background": false,
       "long_running": false,
@@ -446,7 +747,126 @@
         "title": "RunEditorSqlParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "rows_affected": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rows Affected"
+          },
+          "query_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Query Type"
+          },
+          "tables": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tables"
+          },
+          "exec_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Exec Ms"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Plan"
+          },
+          "sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sql"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Columns"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rows"
+          },
+          "total_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Rows"
+          }
+        },
+        "title": "RunEditorSqlResult",
+        "type": "object"
+      },
       "event": "sql.executed",
       "background": false,
       "long_running": false,
@@ -481,7 +901,29 @@
         "title": "NlToSqlParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "sql": {
+            "title": "Sql",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "database": {
+            "title": "Database",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql",
+          "question",
+          "database"
+        ],
+        "title": "NlToSqlResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -514,7 +956,25 @@
         "title": "ListHistoryParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "history": {
+            "items": {},
+            "title": "History",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "history",
+          "total"
+        ],
+        "title": "ListHistoryResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -563,7 +1023,31 @@
         "title": "SaveQueryParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "query_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query_id",
+          "name"
+        ],
+        "title": "SaveQueryResult",
+        "type": "object"
+      },
       "event": "query.saved",
       "background": false,
       "long_running": false,
@@ -590,7 +1074,25 @@
         "title": "ListSavedParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "saved_queries": {
+            "items": {},
+            "title": "Saved Queries",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "saved_queries",
+          "total"
+        ],
+        "title": "ListSavedResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -625,7 +1127,48 @@
         "title": "RunSavedParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sql": {
+            "title": "Sql",
+            "type": "string"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "rows": {
+            "items": {},
+            "title": "Rows",
+            "type": "array"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          },
+          "exec_ms": {
+            "title": "Exec Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "sql",
+          "columns",
+          "rows",
+          "total_rows",
+          "exec_ms"
+        ],
+        "title": "RunSavedResult",
+        "type": "object"
+      },
       "event": "",
       "background": false,
       "long_running": false,
@@ -662,7 +1205,19 @@
         "title": "DeleteSavedParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "query_id": {
+            "title": "Query Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query_id"
+        ],
+        "title": "DeleteSavedResult",
+        "type": "object"
+      },
       "event": "query.deleted",
       "background": false,
       "long_running": false,
@@ -691,7 +1246,19 @@
         "title": "PulseParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "PulseSqlResult",
+        "type": "object"
+      },
       "event": "sql.executed",
       "background": false,
       "long_running": false,
@@ -734,7 +1301,28 @@
         "title": "InsertRowParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "rows_affected": {
+            "title": "Rows Affected",
+            "type": "integer"
+          },
+          "inserted_id": {
+            "title": "Inserted Id"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rows_affected",
+          "inserted_id",
+          "table"
+        ],
+        "title": "InsertRowResult",
+        "type": "object"
+      },
       "event": "row.inserted",
       "background": false,
       "long_running": false,
@@ -789,7 +1377,30 @@
         "title": "UpdateRowParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "rows_affected": {
+            "title": "Rows Affected",
+            "type": "integer"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          },
+          "pk": {
+            "additionalProperties": true,
+            "title": "Pk",
+            "type": "object"
+          }
+        },
+        "required": [
+          "rows_affected",
+          "table",
+          "pk"
+        ],
+        "title": "RowMutateResult",
+        "type": "object"
+      },
       "event": "row.updated",
       "background": false,
       "long_running": false,
@@ -838,7 +1449,30 @@
         "title": "DeleteRowParams",
         "type": "object"
       },
-      "return_schema": {},
+      "return_schema": {
+        "properties": {
+          "rows_affected": {
+            "title": "Rows Affected",
+            "type": "integer"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          },
+          "pk": {
+            "additionalProperties": true,
+            "title": "Pk",
+            "type": "object"
+          }
+        },
+        "required": [
+          "rows_affected",
+          "table",
+          "pk"
+        ],
+        "title": "RowMutateResult",
+        "type": "object"
+      },
       "event": "row.deleted",
       "background": false,
       "long_running": false,
@@ -858,7 +1492,7 @@
   },
   "lifecycle_hooks": {
     "on_install": {
-      "signature": "(ctx) -> 'None'"
+      "signature": "(ctx) -> None"
     }
   }
 }

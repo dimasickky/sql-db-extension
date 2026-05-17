@@ -10,6 +10,8 @@ from app import (
     DbSchemaSnapshot, SCHEMA_CACHE_KEY, SCHEMA_CACHE_TTL,
     _translate_db_error,
 )
+from models_return import *  # noqa: F401,F403 — data_model DTOs
+
 
 log = logging.getLogger("sql-db")
 
@@ -87,6 +89,7 @@ _SELECT_VERBS = {"SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "EXPLAIN"}
 
 @chat.function(
     "run_query", action_type="read",
+    data_model=QueryResult,
     description=(
         "Run a read-only query (SELECT/WITH/SHOW/DESCRIBE/EXPLAIN). "
         "Use execute_sql for INSERT/UPDATE/DELETE/DDL."
@@ -141,6 +144,7 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
 
 @chat.function(
     "get_schema", action_type="read",
+    data_model=GetSchemaResult,
     description="Get database schema — tables, columns, indexes.",
 )
 async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
@@ -196,6 +200,7 @@ async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
 @chat.function(
     "explain_query", action_type="read",
     description="Run EXPLAIN on a query to see execution plan.",
+    data_model=ExplainResult,
 )
 async def fn_explain_query(ctx, params: ExplainParams) -> ActionResult:
     """Run EXPLAIN on a query to see execution plan."""
@@ -222,6 +227,7 @@ async def fn_explain_query(ctx, params: ExplainParams) -> ActionResult:
 @chat.function(
     "dry_run", action_type="read",
     description="Dry-run a DML statement: execute in transaction, count affected rows, then ROLLBACK.",
+    data_model=DryRunResult,
 )
 async def fn_dry_run(ctx, params: DryRunParams) -> ActionResult:
     """Dry-run a DML statement: execute in transaction, count affected rows, then ROLLBACK."""

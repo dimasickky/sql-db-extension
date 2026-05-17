@@ -7,6 +7,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 log = logging.getLogger("sql-db")
 
 from app import chat, ActionResult, _api_post, require_user_id, build_conn_info, _translate_db_error
+from models_return import *  # noqa: F401,F403 — data_model DTOs
 from handlers_query import _resolve, RunQueryParams, ExplainParams  # noqa: F401
 from schema_guard import (
     load_schema_section,
@@ -66,6 +67,7 @@ def _first_word(sql: str) -> str:
 @chat.function(
     "execute_sql", action_type="destructive", chain_callable=True,
     effects=["execute:sql"], event="sql.executed",
+    data_model=SqlExecuteResult,
     description=(
         "Execute a write statement (INSERT, UPDATE, DELETE, REPLACE, ALTER, "
         "CREATE, DROP, TRUNCATE). Use this for all database mutations "
@@ -208,6 +210,7 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
 @chat.function(
     "run_editor_sql", action_type="write", chain_callable=True,
     effects=["execute:sql"], event="sql.executed",
+    data_model=RunEditorSqlResult,
     description="Run any SQL from the editor. Auto-detects: SELECT goes to query, DML/DDL goes to execute.",
 )
 async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
