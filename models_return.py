@@ -154,3 +154,10 @@ class RowMutateResult(BaseModel):
     rows_affected: int
     table: str
     pk: dict[str, Any]
+
+
+class CountTableResult(BaseModel):
+    database: str
+    table: str
+    count: int
+    exec_ms: int

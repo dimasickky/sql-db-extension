@@ -262,7 +262,7 @@ async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionRes
     uid = require_user_id(ctx)
     try:
         target = await get_connection_by_id(ctx, params.connection_id)
-        if not target:
+        if not target or target.get("user_id", "") != uid:
             return ActionResult.error("Connection not found")
         page = await ctx.store.query(CONN_COLLECTION, where={"user_id": uid}, limit=100)
         for doc in page.data:
