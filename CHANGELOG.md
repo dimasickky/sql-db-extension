@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.7.0] — 2026-05-18
+
+### Added
+- **`count_table(table, database?, connection_id?)`** — exact row count via `SELECT COUNT(*)`. Uses the T3 backend endpoint `/v1/connections/{id}/tables/{table}/count`. Use this instead of `get_schema()` when the user asks how many rows are in a table — `get_schema()` returns INFORMATION_SCHEMA estimates which can be 0 or significantly off for InnoDB tables.
+
+### Fixed
+- **`on_event` format** — `panels.py` and `panels_editor.py` now use correct `sql-db.` app-id prefix (`sql-db.connection.added`, `sql-db.table.touched`, `sql-db.row.inserted` etc.). Per SDK docs: kernel prepends `app_id` when emitting — panel subscription must match the full event name.
+- **`select_connection` authorization** — added ownership check: `target.get("user_id") != uid` returns "Connection not found" instead of activating another user's connection.
+- **`system_prompt.txt`** — added `ROW COUNT ACCURACY` section: clarifies that `get_schema()` rows are INFORMATION_SCHEMA estimates (can be 0 or wrong), `run_query()` `total_rows` = fetched rows count after LIMIT, and `count_table()` is the only guaranteed-accurate source. Added routing rule 4a for "how many rows" queries.
+
+---
+
 ## [2.6.0] — 2026-05-17
 
 ### Changed
