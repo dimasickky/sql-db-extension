@@ -72,27 +72,15 @@ async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
         if not schema_desc:
             return ActionResult.error("No schema available. Run get_schema first.")
 
-        # Use ctx.llm (platform default — works without BYOLLM)
-        response = await ctx.llm.create_message(
-            system="You are a SQL expert. Given a database schema, write a valid SQL SELECT query. Return ONLY the SQL, no explanation, no markdown fences.",
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Database schema:\n\n{schema_desc}\n\n"
-                    f"Write a SQL SELECT query that answers: {params.question}"
-                ),
-            }],
-            max_tokens=512,
-            purpose="nl_to_sql",
+        # ctx.ai.complete() — correct SDK API, returns CompletionResult.text (str).
+        # Calls Imperal Gateway which resolves BYOLLM or platform default.
+        prompt = (
+            f"Database schema:\n\n{schema_desc}\n\n"
+            f"Write a SQL SELECT query that answers: {params.question}\n\n"
+            "Return ONLY the SQL query, no explanation, no markdown fences."
         )
-        # Anthropic returns content as list[ContentBlock]; OpenAI returns string
-        if isinstance(response.content, list):
-            raw = response.content[0].text if response.content else ""
-        elif hasattr(response, "choices"):
-            raw = response.choices[0].message.content or ""
-        else:
-            raw = str(response.content)
-        sql = raw.strip().strip("`").strip()
+        completion = await ctx.ai.complete(prompt)
+        sql = completion.text.strip().strip("`").strip()
         if sql.lower().startswith("sql"):
             sql = sql[3:].strip()
 
