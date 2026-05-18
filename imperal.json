@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.0.1",
   "app_id": "sql-db",
-  "version": "2.10.0",
+  "version": "2.11.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -410,7 +410,7 @@
     },
     {
       "name": "run_query",
-      "description": "Run a read-only SQL query (SELECT/WITH/SHOW). PREREQUISITE: you must know the exact table name and column names. If you don't know them — call get_schema() first. NEVER guess table or column names. Use execute_sql for INSERT/UPDATE/DELETE/DDL.",
+      "description": "Run a read-only SQL query (SELECT/WITH/SHOW). PREREQUISITE: you must know the EXACT table name AND column names. If you only know the table name — call get_table_detail(table='name') first to get columns. If you don't know the table name — call list_tables(search='keyword') first. NEVER guess column names. Use execute_sql for INSERT/UPDATE/DELETE/DDL.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -793,8 +793,8 @@
             "title": "Database",
             "type": "string"
           },
-          "total_count": {
-            "title": "Total Count",
+          "total_matching": {
+            "title": "Total Matching",
             "type": "integer"
           },
           "search": {
@@ -811,7 +811,7 @@
         },
         "required": [
           "database",
-          "total_count",
+          "total_matching",
           "search",
           "tables"
         ],
