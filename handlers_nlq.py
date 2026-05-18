@@ -85,7 +85,14 @@ async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
             max_tokens=512,
             purpose="nl_to_sql",
         )
-        sql = response.content.strip().strip("`").strip()
+        # Anthropic returns content as list[ContentBlock]; OpenAI returns string
+        if isinstance(response.content, list):
+            raw = response.content[0].text if response.content else ""
+        elif hasattr(response, "choices"):
+            raw = response.choices[0].message.content or ""
+        else:
+            raw = str(response.content)
+        sql = raw.strip().strip("`").strip()
         if sql.lower().startswith("sql"):
             sql = sql[3:].strip()
 
