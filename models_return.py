@@ -172,7 +172,7 @@ class TableListItem(BaseModel):
 
 class ListTablesResult(BaseModel):
     database: str
-    total_count: int
+    total_matching: int  # count of tables matching search, NOT total tables in DB
     search: str
     tables: list[TableListItem]
 

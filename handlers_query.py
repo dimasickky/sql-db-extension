@@ -92,9 +92,10 @@ _SELECT_VERBS = {"SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "EXPLAIN"}
     data_model=QueryResult,
     description=(
         "Run a read-only SQL query (SELECT/WITH/SHOW). "
-        "PREREQUISITE: you must know the exact table name and column names. "
-        "If you don't know them — call get_schema() first. "
-        "NEVER guess table or column names. Use execute_sql for INSERT/UPDATE/DELETE/DDL."
+        "PREREQUISITE: you must know the EXACT table name AND column names. "
+        "If you only know the table name — call get_table_detail(table='name') first to get columns. "
+        "If you don't know the table name — call list_tables(search='keyword') first. "
+        "NEVER guess column names. Use execute_sql for INSERT/UPDATE/DELETE/DDL."
     ),
 )
 async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
@@ -411,15 +412,26 @@ async def fn_list_tables(ctx, params: ListTablesParams) -> ActionResult:
             }
             for t in items
         ]
-        total = result.get("total_count", len(items))
-        search_label = f" matching '{params.search}'" if params.search else ""
+        total_matching = result.get("total_count", len(items))
+        if params.search:
+            summary = (
+                f"Found {total_matching} table(s) matching '{params.search}', "
+                f"showing {len(table_list)}. "
+                f"Call get_table_detail(table='<name>') to get columns before querying."
+            )
+        else:
+            summary = (
+                f"{len(table_list)} of {total_matching} total table(s) in '{database}'. "
+                f"Use search= to filter by name. "
+                f"Call get_table_detail(table='<name>') to get columns before querying."
+            )
         return ActionResult.success(
-            summary=f"{len(table_list)} table(s){search_label} (total in DB: {total}).",
+            summary=summary,
             data={
-                "database":    database,
-                "total_count": total,
-                "search":      params.search,
-                "tables":      table_list,
+                "database":       database,
+                "total_matching": total_matching,  # count of tables matching search filter
+                "search":         params.search,
+                "tables":         table_list,
             },
         )
     except Exception as e:
