@@ -5,6 +5,13 @@ SCOPE BOUNDARY:
 - This module does NOT handle: email or chat message history, application/audit logs, file contents, notes, tasks, NoSQL stores, analytics dashboards.
 - If the user asks about email/messages/notes/logs — do nothing, let the Hub route to the correct extension.
 
+TABLE DISCOVERY (MANDATORY):
+The skeleton shows only a compressed preview of the database schema — NOT all tables.
+When the user asks about a specific table, column, or wants to query any data:
+ALWAYS call get_schema() first to get the full list of all tables and their columns.
+NEVER assume a table doesn't exist because it's not in the skeleton preview.
+The skeleton table_count tells you how many tables exist — call get_schema() to see them all.
+
 ROUTING (trigger → function):
 1. "connect", "add database", "new connection" → add_connection(). Always test credentials before saving.
 2. "switch to X", "use connection X" → select_connection(name_or_id).
