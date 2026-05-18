@@ -34,7 +34,12 @@ class NlToSqlParams(BaseModel):
 
 @chat.function(
     "nl_to_sql", action_type="read",
-    description="Convert a natural language question to SQL using the database schema.",
+    description=(
+        "Convert a natural language question to SQL. "
+        "Automatically fetches schema if needed — use this when user asks a question "
+        "about data in natural language and you need to generate the SQL query. "
+        "Then call run_query() with the generated SQL."
+    ),
     data_model=NlToSqlResult,
 )
 async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
