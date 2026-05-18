@@ -6,7 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
-## [2.10.0] — 2026-05-18
+## [2.12.0] — 2026-05-18\n\n### Fixed\n- **Connection form — `ui.Stack` → `ui.Form`** — critical fix: the "New Connection" panel form was using `ui.Stack` + bare `ui.Call`. Without `ui.Form`, `param_name` values from `ui.Input` are NOT collected on button click — `add_connection` received empty `{}` → Pydantic error for missing `host`/`db_user`/`password`. Fixed by wrapping in `ui.Form(action="add_connection", defaults={"port": "3306"})` with `type="submit"` button.\n\n---\n\n## [2.10.0] — 2026-05-18
 
 ### Added
 - **`list_tables(search, database?, connection_id?)`** — lightweight table search using T1 backend endpoint. Returns only table names/sizes, never truncated by chain executor. Solves the "only 8 tables visible" problem: `list_tables(search="tbl")` returns all a table/a table/etc instantly.
