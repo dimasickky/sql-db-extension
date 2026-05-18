@@ -6,7 +6,43 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
-## [2.12.0] — 2026-05-18\n\n### Fixed\n- **Connection form — `ui.Stack` → `ui.Form`** — critical fix: the "New Connection" panel form was using `ui.Stack` + bare `ui.Call`. Without `ui.Form`, `param_name` values from `ui.Input` are NOT collected on button click — `add_connection` received empty `{}` → Pydantic error for missing `host`/`db_user`/`password`. Fixed by wrapping in `ui.Form(action="add_connection", defaults={"port": "3306"})` with `type="submit"` button.\n\n---\n\n## [2.10.0] — 2026-05-18
+## [2.15.0] — 2026-05-18
+
+### Fixed
+- **`panels.py` — `ui.Button(type="submit")` removed** — `type=` is not a valid `ui.Button` kwarg; presence caused a validator warning on every panel render. New-connection form now uses `ui.Form(submit_label="Connect")` which renders the submit button automatically.
+
+---
+
+## [2.14.0] — 2026-05-18
+
+### Fixed
+- **`nl_to_sql` — reverted to `ctx.ai.complete()` per SDK contract** — v2.8.0 switched to `ctx.llm.create_message()` as a workaround for BYOLLM users; however the SDK contract designates `ctx.ai` as the correct AI completion surface (maps to the platform's model routing, including BYOLLM when configured and fallback to platform default otherwise). Reverted to `ctx.ai.complete(prompt)` which is the federally correct call.
+
+---
+
+## [2.13.0] — 2026-05-18
+
+### Fixed
+- **`nl_to_sql` — Anthropic `response.content` list vs string** — `ctx.ai.complete()` (and `ctx.llm.create_message()`) returns a `CompletionResult` whose `.text` may be either a plain `str` or (in some Anthropic SDK versions) a `list[ContentBlock]`. Added `.text` extraction guard: if `isinstance(result.text, list)` extract `[b.text for b in result.text if hasattr(b, 'text')]`; join on `"\n"`. Prevents `TypeError: argument of type 'list' is not iterable` on schema-heavy prompts.
+
+---
+
+## [2.12.0] — 2026-05-18
+
+### Fixed
+- **Connection form — `ui.Stack` → `ui.Form`** — critical fix: the "New Connection" panel form was using `ui.Stack` + bare `ui.Call`. Without `ui.Form`, `param_name` values from `ui.Input` are NOT collected on button click — `add_connection` received empty `{}` → Pydantic error for missing `host`/`db_user`/`password`. Fixed by wrapping in `ui.Form(action="add_connection", defaults={"port": "3306"})` with submit button via `submit_label=`.
+
+---
+
+## [2.11.0] — 2026-05-18
+
+### Fixed
+- **`list_tables` — `total_matching` clarity** — response now returns `total_matching: int` alongside `tables: list[TableItem]`; description updated to say "returns up to N matching tables; if total_matching > len(tables) call again with search= to narrow down". Prevents LLM from treating a partial page as the full schema.
+- **`run_query` prerequisite description** — description now starts: "PREREQUISITE: you MUST know the exact table and column names before calling this. If unknown — call list_tables() + get_table_detail() first. NEVER guess column names." Ensures classifier routes table-discovery intent to the right handler instead of run_query.
+
+---
+
+## [2.10.0] — 2026-05-18
 
 ### Added
 - **`list_tables(search, database?, connection_id?)`** — lightweight table search using T1 backend endpoint. Returns only table names/sizes, never truncated by chain executor. Solves the "only 8 tables visible" problem: `list_tables(search="tbl")` returns all a table/a table/etc instantly.
