@@ -6,6 +6,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.10.0] — 2026-05-18
+
+### Added
+- **`list_tables(search, database?, connection_id?)`** — lightweight table search using T1 backend endpoint. Returns only table names/sizes, never truncated by chain executor. Solves the "only 8 tables visible" problem: `list_tables(search="tbl")` returns all a table/a table/etc instantly.
+- **`get_table_detail(table, database?, connection_id?)`** — columns + indexes for ONE specific table using T2 backend endpoint. Use after list_tables() to get exact column names before run_query().
+
+### Changed
+- **`get_schema` description** — redirects to `list_tables + get_table_detail` pattern for large databases. get_schema() still works for full schema overview.
+- **`system_prompt.txt`** — TABLE DISCOVERY rewritten as 3-step mandatory pattern: `list_tables → get_table_detail → run_query`.
+
+Root cause of "8 tables only": `get_schema()` returns 277 tables × all columns = large JSON → BUG-G (chain_prior_step_max_chars truncation). T1/T2 tiered approach returns small focused responses that never hit the truncation limit.
+
+---
+
 ## [2.9.0] — 2026-05-18
 
 ### Fixed

@@ -161,3 +161,43 @@ class CountTableResult(BaseModel):
     table: str
     count: int
     exec_ms: int
+
+
+class TableListItem(BaseModel):
+    name: str
+    type: str
+    rows_estimate: int
+    size_bytes: int
+
+
+class ListTablesResult(BaseModel):
+    database: str
+    total_count: int
+    search: str
+    tables: list[TableListItem]
+
+
+class TableColumnDetail(BaseModel):
+    name: str
+    type: str
+    nullable: str
+    key: str
+    default: str | None = None
+    extra: str = ""
+
+
+class TableIndexDetail(BaseModel):
+    name: str
+    unique: bool
+    columns: list[str]
+
+
+class GetTableDetailResult(BaseModel):
+    database: str
+    table: str
+    exists: bool
+    type: str = ""
+    engine: str = ""
+    rows_estimate: int = 0
+    columns: list[TableColumnDetail]
+    indexes: list[TableIndexDetail]

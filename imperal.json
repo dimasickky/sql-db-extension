@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.0.1",
   "app_id": "sql-db",
-  "version": "2.9.0",
+  "version": "2.10.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -482,7 +482,7 @@
     },
     {
       "name": "get_schema",
-      "description": "Get the full database schema — ALL tables, columns, types, indexes. Call this FIRST when: user asks about a specific table, asks to find data, or before any run_query/execute_sql call where you don't know exact table/column names. The skeleton shows only a preview — this returns all tables.",
+      "description": "Get full schema for ALL tables at once (columns, indexes). WARNING: for databases with >50 tables the response may be large. PREFER: list_tables(search=...) to find a table, then get_table_detail() for its columns. Use get_schema() only when user explicitly asks for the full schema overview.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -711,6 +711,277 @@
           "exec_ms"
         ],
         "title": "CountTableResult",
+        "type": "object"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "list_tables",
+      "description": "Search for tables by name. Use this FIRST when user mentions a table by name or asks to find a table — returns just table names, very fast, never truncated. Examples: search='tbl' finds all a table/a table/etc, search='invoice' finds invoice-related tables. Then call get_table_detail() for column structure of the specific table you found.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "search": {
+            "default": "",
+            "description": "Filter tables by name prefix or substring (e.g. 'tbl', 'invoice'). Empty = all tables.",
+            "title": "Search",
+            "type": "string"
+          },
+          "database": {
+            "default": "",
+            "description": "Database name. Omit to use active connection default.",
+            "title": "Database",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID. Omit for active.",
+            "title": "Connection Id",
+            "type": "string"
+          },
+          "limit": {
+            "default": 200,
+            "maximum": 1000,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "ListTablesParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "TableListItem": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "type": {
+                "title": "Type",
+                "type": "string"
+              },
+              "rows_estimate": {
+                "title": "Rows Estimate",
+                "type": "integer"
+              },
+              "size_bytes": {
+                "title": "Size Bytes",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "rows_estimate",
+              "size_bytes"
+            ],
+            "title": "TableListItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "database": {
+            "title": "Database",
+            "type": "string"
+          },
+          "total_count": {
+            "title": "Total Count",
+            "type": "integer"
+          },
+          "search": {
+            "title": "Search",
+            "type": "string"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/$defs/TableListItem"
+            },
+            "title": "Tables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "database",
+          "total_count",
+          "search",
+          "tables"
+        ],
+        "title": "ListTablesResult",
+        "type": "object"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "get_table_detail",
+      "description": "Get columns, indexes, and foreign keys for ONE specific table. Use after list_tables() to get the structure of a table you found. Returns exact column names and types needed before running run_query().",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "table": {
+            "description": "Exact table name (from list_tables response).",
+            "title": "Table",
+            "type": "string"
+          },
+          "database": {
+            "default": "",
+            "description": "Database name. Omit to use active connection default.",
+            "title": "Database",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID. Omit for active.",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table"
+        ],
+        "title": "GetTableDetailParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "TableColumnDetail": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "type": {
+                "title": "Type",
+                "type": "string"
+              },
+              "nullable": {
+                "title": "Nullable",
+                "type": "string"
+              },
+              "key": {
+                "title": "Key",
+                "type": "string"
+              },
+              "default": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Default"
+              },
+              "extra": {
+                "default": "",
+                "title": "Extra",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "nullable",
+              "key"
+            ],
+            "title": "TableColumnDetail",
+            "type": "object"
+          },
+          "TableIndexDetail": {
+            "properties": {
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "unique": {
+                "title": "Unique",
+                "type": "boolean"
+              },
+              "columns": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Columns",
+                "type": "array"
+              }
+            },
+            "required": [
+              "name",
+              "unique",
+              "columns"
+            ],
+            "title": "TableIndexDetail",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "database": {
+            "title": "Database",
+            "type": "string"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "type": {
+            "default": "",
+            "title": "Type",
+            "type": "string"
+          },
+          "engine": {
+            "default": "",
+            "title": "Engine",
+            "type": "string"
+          },
+          "rows_estimate": {
+            "default": 0,
+            "title": "Rows Estimate",
+            "type": "integer"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/$defs/TableColumnDetail"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "indexes": {
+            "items": {
+              "$ref": "#/$defs/TableIndexDetail"
+            },
+            "title": "Indexes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "database",
+          "table",
+          "exists",
+          "columns",
+          "indexes"
+        ],
+        "title": "GetTableDetailResult",
         "type": "object"
       },
       "event": "",
