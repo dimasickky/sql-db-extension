@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.9.0] — 2026-05-18
+
+### Fixed
+- **`get_schema` description** — now explicitly says "call this FIRST when user asks about a specific table or before any query". The classifier reads descriptions for routing — without this it routed directly to `run_query` guessing table names.
+- **`run_query` description** — added "PREREQUISITE: you must know exact table/column names. If not — call get_schema() first. NEVER guess."
+- **`nl_to_sql` description** — clarified that it auto-fetches schema and generates SQL, then `run_query` should follow.
+
+Root cause: `system_prompt.txt` rules reach the LLM narrator, not the classifier. Classifier routing is controlled entirely by `@chat.function(description=...)` fields.
+
+---
+
 ## [2.8.0] — 2026-05-18
 
 ### Fixed

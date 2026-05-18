@@ -91,8 +91,10 @@ _SELECT_VERBS = {"SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "EXPLAIN"}
     "run_query", action_type="read",
     data_model=QueryResult,
     description=(
-        "Run a read-only query (SELECT/WITH/SHOW/DESCRIBE/EXPLAIN). "
-        "Use execute_sql for INSERT/UPDATE/DELETE/DDL."
+        "Run a read-only SQL query (SELECT/WITH/SHOW). "
+        "PREREQUISITE: you must know the exact table name and column names. "
+        "If you don't know them — call get_schema() first. "
+        "NEVER guess table or column names. Use execute_sql for INSERT/UPDATE/DELETE/DDL."
     ),
 )
 async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
@@ -145,7 +147,12 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
 @chat.function(
     "get_schema", action_type="read",
     data_model=GetSchemaResult,
-    description="Get database schema — tables, columns, indexes.",
+    description=(
+        "Get the full database schema — ALL tables, columns, types, indexes. "
+        "Call this FIRST when: user asks about a specific table, asks to find data, "
+        "or before any run_query/execute_sql call where you don't know exact table/column names. "
+        "The skeleton shows only a preview — this returns all tables."
+    ),
 )
 async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
     """Get database schema — tables, columns, indexes."""
