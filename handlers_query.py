@@ -148,10 +148,10 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
     "get_schema", action_type="read",
     data_model=GetSchemaResult,
     description=(
-        "Get the full database schema — ALL tables, columns, types, indexes. "
-        "Call this FIRST when: user asks about a specific table, asks to find data, "
-        "or before any run_query/execute_sql call where you don't know exact table/column names. "
-        "The skeleton shows only a preview — this returns all tables."
+        "Get full schema for ALL tables at once (columns, indexes). "
+        "WARNING: for databases with >50 tables the response may be large. "
+        "PREFER: list_tables(search=...) to find a table, then get_table_detail() for its columns. "
+        "Use get_schema() only when user explicitly asks for the full schema overview."
     ),
 )
 async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
@@ -327,4 +327,169 @@ async def fn_count_table(ctx, params: CountTableParams) -> ActionResult:
         )
     except Exception as e:
         log.error("count_table: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+
+
+# ─── list_tables + get_table_detail (Tier-1 / Tier-2 lightweight schema) ──── #
+
+class ListTablesParams(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    search: str = Field(
+        default="",
+        description="Filter tables by name prefix or substring (e.g. 'tbl', 'invoice'). Empty = all tables.",
+        validation_alias=AliasChoices("search", "prefix", "filter", "query"),
+    )
+    database: str = Field(
+        default="",
+        description="Database name. Omit to use active connection default.",
+    )
+    connection_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("connection_id", "conn_id", "connection"),
+        description="Connection ID. Omit for active.",
+    )
+    limit: int = Field(default=200, ge=1, le=1000)
+
+
+class GetTableDetailParams(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    table: str = Field(
+        ...,
+        description="Exact table name (from list_tables response).",
+        validation_alias=AliasChoices("table", "table_name"),
+    )
+    database: str = Field(
+        default="",
+        description="Database name. Omit to use active connection default.",
+    )
+    connection_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("connection_id", "conn_id", "connection"),
+        description="Connection ID. Omit for active.",
+    )
+
+
+@chat.function(
+    "list_tables",
+    action_type="read",
+    data_model=ListTablesResult,
+    description=(
+        "Search for tables by name. Use this FIRST when user mentions a table by name "
+        "or asks to find a table — returns just table names, very fast, never truncated. "
+        "Examples: search='tbl' finds all tblInvoices/tblOrders/etc, search='invoice' finds invoice-related tables. "
+        "Then call get_table_detail() for column structure of the specific table you found."
+    ),
+)
+async def fn_list_tables(ctx, params: ListTablesParams) -> ActionResult:
+    try:
+        conn, conn_id = await _resolve(ctx, params.connection_id)
+        if not conn:
+            return ActionResult.error("No active connection. Use add_connection first.")
+
+        database = params.database or conn.get("database", "")
+        if not database:
+            return ActionResult.error("No database specified.")
+
+        result = await _api_post(
+            ctx,
+            f"/v1/connections/{conn_id}/tables?search={params.search}&offset=0&limit={params.limit}",
+            {"user_id": require_user_id(ctx), "database": database, "connection": build_conn_info(conn)},
+        )
+
+        if result.get("status") != "ok":
+            return ActionResult.error(result.get("detail", "Couldn't list tables"))
+
+        items = result.get("items", [])
+        table_list = [
+            {
+                "name":          t["name"],
+                "type":          t.get("type", "BASE TABLE"),
+                "rows_estimate": t.get("rows_estimate", 0),
+                "size_bytes":    t.get("size_bytes", 0),
+            }
+            for t in items
+        ]
+        total = result.get("total_count", len(items))
+        search_label = f" matching '{params.search}'" if params.search else ""
+        return ActionResult.success(
+            summary=f"{len(table_list)} table(s){search_label} (total in DB: {total}).",
+            data={
+                "database":    database,
+                "total_count": total,
+                "search":      params.search,
+                "tables":      table_list,
+            },
+        )
+    except Exception as e:
+        log.error("list_tables: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+
+
+@chat.function(
+    "get_table_detail",
+    action_type="read",
+    data_model=GetTableDetailResult,
+    description=(
+        "Get columns, indexes, and foreign keys for ONE specific table. "
+        "Use after list_tables() to get the structure of a table you found. "
+        "Returns exact column names and types needed before running run_query()."
+    ),
+)
+async def fn_get_table_detail(ctx, params: GetTableDetailParams) -> ActionResult:
+    try:
+        conn, conn_id = await _resolve(ctx, params.connection_id)
+        if not conn:
+            return ActionResult.error("No active connection. Use add_connection first.")
+
+        database = params.database or conn.get("database", "")
+        if not database:
+            return ActionResult.error("No database specified.")
+
+        result = await _api_post(
+            ctx,
+            f"/v1/connections/{conn_id}/tables/{params.table}/detail",
+            {"user_id": require_user_id(ctx), "database": database, "connection": build_conn_info(conn)},
+        )
+
+        if result.get("status") != "ok":
+            return ActionResult.error(result.get("detail", "Couldn't fetch table detail"))
+
+        if not result.get("exists", True):
+            return ActionResult.error(
+                f"Table '{params.table}' does not exist in '{database}'. "
+                "Call list_tables() to find the correct table name."
+            )
+
+        cols = [
+            {
+                "name":     c.get("COLUMN_NAME", ""),
+                "type":     c.get("COLUMN_TYPE", ""),
+                "nullable": c.get("IS_NULLABLE", ""),
+                "key":      c.get("COLUMN_KEY", ""),
+                "default":  c.get("COLUMN_DEFAULT"),
+                "extra":    c.get("EXTRA", ""),
+            }
+            for c in result.get("columns", [])
+        ]
+        indexes = [
+            {"name": i["name"], "unique": i["unique"], "columns": i["columns"]}
+            for i in result.get("indexes", [])
+        ]
+        return ActionResult.success(
+            summary=f"Table '{params.table}': {len(cols)} columns.",
+            data={
+                "database":    database,
+                "table":       params.table,
+                "exists":      True,
+                "type":        result.get("type", "BASE TABLE"),
+                "engine":      result.get("engine", ""),
+                "rows_estimate": result.get("rows_estimate", 0),
+                "columns":     cols,
+                "indexes":     indexes,
+            },
+        )
+    except Exception as e:
+        log.error("get_table_detail: %s", e)
         return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)

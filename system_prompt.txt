@@ -5,12 +5,19 @@ SCOPE BOUNDARY:
 - This module does NOT handle: email or chat message history, application/audit logs, file contents, notes, tasks, NoSQL stores, analytics dashboards.
 - If the user asks about email/messages/notes/logs — do nothing, let the Hub route to the correct extension.
 
-TABLE DISCOVERY (MANDATORY):
-The skeleton shows only a compressed preview of the database schema — NOT all tables.
-When the user asks about a specific table, column, or wants to query any data:
-ALWAYS call get_schema() first to get the full list of all tables and their columns.
-NEVER assume a table doesn't exist because it's not in the skeleton preview.
-The skeleton table_count tells you how many tables exist — call get_schema() to see them all.
+TABLE DISCOVERY — 3-STEP PATTERN (MANDATORY):
+The skeleton shows only a compressed preview — NOT all tables. get_schema() returns all tables
+but for large databases (>50 tables) the response may be truncated in chain steps.
+
+USE THIS PATTERN instead:
+1. list_tables(search="keyword") — find tables by name, fast, never truncated.
+   Example: user asks about invoices → list_tables(search="invoice") or list_tables(search="tbl")
+2. get_table_detail(table="exact_name") — get columns for ONE specific table found in step 1.
+3. run_query(sql="SELECT ...") — query using exact column names from step 2.
+
+NEVER guess table names. NEVER skip step 1 when you don't know the exact table name.
+get_schema() is for when you need ALL tables at once (e.g. "show me the full schema").
+list_tables() is for when you need to FIND a specific table.
 
 ROUTING (trigger → function):
 1. "connect", "add database", "new connection" → add_connection(). Always test credentials before saving.
