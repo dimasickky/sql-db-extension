@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.8.0] — 2026-05-18
+
+### Fixed
+- **`nl_to_sql` — `ctx.ai.complete()` → `ctx.llm.create_message()`** — critical fix: `ctx.ai` requires BYOLLM billing configured; `ctx.llm` falls back to platform default (Sonnet 4.6) when BYOLLM is not set up. Users without BYOLLM now get `nl_to_sql` working out-of-the-box.
+- **Skeleton `table_names` field** — added flat `table_names: list[str]` alongside existing `tables: list[dict]`. SDK compression collapses `list[dict]` >5 items to opaque `list[N]`, making table names invisible to the LLM classifier. Flat string list is more visible after compression.
+- **`system_prompt.txt` TABLE DISCOVERY rule** — added mandatory rule: "always call `get_schema()` when user asks about specific tables". Prevents LLM from answering from compressed skeleton preview and missing tables.
+
+---
+
 ## [2.7.0] — 2026-05-18
 
 ### Added

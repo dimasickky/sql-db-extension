@@ -65,10 +65,14 @@ async def skeleton_refresh_db_schema(ctx) -> dict:
             ]
             compact_tables.append({"name": t["name"], "rows": t.get("rows", 0), "columns": cols})
 
+        # Store table_names as flat list of strings — SDK compression collapses
+        # list[dict] >5 items to list[N], so we keep names separate for LLM visibility.
+        table_names = [t["name"] for t in compact_tables]
         payload = {
             "database":    database,
             "connection":  conn.get("name", ""),
             "table_count": len(compact_tables),
+            "table_names": table_names,  # flat string list — better LLM visibility
             "tables":      compact_tables,
         }
         await _mirror_to_cache(ctx, payload)
