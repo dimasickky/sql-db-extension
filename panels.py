@@ -97,24 +97,23 @@ async def sql_sidebar(ctx, active_conn_id: str = "", view: str = "main", **kwarg
     if view == "new_connection":
         children.append(ui.Card(
             title="New Connection",
-            content=ui.Form(
-                action="add_connection",
-                defaults={"port": "3306"},
-                children=[
-                    ui.Input(placeholder="Connection name (optional)", param_name="name"),
-                    ui.Input(placeholder="Host (e.g. db.example.com)", param_name="host"),
-                    ui.Input(placeholder="Port", param_name="port"),
-                    ui.Input(placeholder="Username", param_name="db_user"),
-                    ui.Password(placeholder="Password", param_name="password"),
-                    ui.Input(placeholder="Database name", param_name="database"),
-                    ui.Stack([
-                        ui.Button("Connect", icon="PlugZap", variant="primary",
-                                  size="sm", type="submit"),
-                        ui.Button("Cancel", variant="ghost", size="sm",
-                                  on_click=ui.Call("__panel__sidebar", view="main")),
-                    ], direction="horizontal"),
-                ],
-            ),
+            content=ui.Stack([
+                ui.Form(
+                    action="add_connection",
+                    submit_label="Connect",
+                    defaults={"port": "3306"},
+                    children=[
+                        ui.Input(placeholder="Connection name (optional)", param_name="name"),
+                        ui.Input(placeholder="Host (e.g. db.example.com)", param_name="host"),
+                        ui.Input(placeholder="Port", param_name="port"),
+                        ui.Input(placeholder="Username", param_name="db_user"),
+                        ui.Password(placeholder="Password", param_name="password"),
+                        ui.Input(placeholder="Database name", param_name="database"),
+                    ],
+                ),
+                ui.Button("Cancel", variant="ghost", size="sm",
+                          on_click=ui.Call("__panel__sidebar", view="main")),
+            ], gap=2),
         ))
 
     # ── Connection list ────────────────────────────────────────────────
