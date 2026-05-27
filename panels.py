@@ -205,7 +205,7 @@ async def _render_schema_block(ctx, conn: dict, conn_id: str, database: str) -> 
 async def _safe_cache_get(ctx, model_cls, key):
     """ctx.cache.get that returns None on any error (miss or backend hiccup)."""
     try:
-        return await ctx.cache.get(model_cls, key)
+        return await ctx.cache.get(key, model_cls)
     except Exception:
         return None
 

@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.15.1] — 2026-05-27
+
+### Fixed
+- **`panels.py` — `ctx.cache.get(model_cls, key)` → `ctx.cache.get(key, model_cls)`** — аргументы были перепутаны в хелпере `_safe_cache_get`; в рантайме кеш всегда промахивался и шёл за данными на бэкенд. Правильный порядок по SDK: ключ первым, класс модели вторым.
+
+### Changed
+- SDK бамп `imperal-sdk==5.0.1` → `5.0.2` (docs-only, source-cite durability fix).
+
+---
+
 ## [2.15.0] — 2026-05-18
 
 ### Fixed
