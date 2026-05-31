@@ -5,7 +5,7 @@ import sys, os
 _dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _dir)
 for _m in [k for k in sys.modules if k in (
-    "app", "handlers_connections", "handlers_query", "handlers_execute",
+    "app", "models_return", "handlers_connections", "handlers_query", "handlers_execute",
     "handlers_nlq", "handlers_history", "handlers_rows",
     "skeleton", "panels", "panels_editor",
     "panels_editor_results", "panels_editor_tabs", "panels_editor_row_form",

@@ -442,7 +442,7 @@ async def fn_list_tables(ctx, params: ListTablesParams) -> ActionResult:
 @chat.function(
     "get_table_detail",
     action_type="read",
-    data_model=GetTableDetailResult,
+    data_model=TableEntity,
     description=(
         "Get columns, indexes, and foreign keys for ONE specific table. "
         "Use after list_tables() to get the structure of a table you found. "
@@ -489,18 +489,21 @@ async def fn_get_table_detail(ctx, params: GetTableDetailParams) -> ActionResult
             {"name": i["name"], "unique": i["unique"], "columns": i["columns"]}
             for i in result.get("indexes", [])
         ]
+        entity = TableEntity(
+            id=f"{database}.{params.table}",
+            title=params.table,
+            kind="table",
+            database=database,
+            exists=True,
+            type=result.get("type", "BASE TABLE"),
+            engine=result.get("engine", ""),
+            rows_estimate=result.get("rows_estimate", 0),
+            columns=[TableColumnDetail(**c) for c in cols],
+            indexes=[TableIndexDetail(**i) for i in indexes],
+        )
         return ActionResult.success(
             summary=f"Table '{params.table}': {len(cols)} columns.",
-            data={
-                "database":    database,
-                "table":       params.table,
-                "exists":      True,
-                "type":        result.get("type", "BASE TABLE"),
-                "engine":      result.get("engine", ""),
-                "rows_estimate": result.get("rows_estimate", 0),
-                "columns":     cols,
-                "indexes":     indexes,
-            },
+            data=entity,
         )
     except Exception as e:
         log.error("get_table_detail: %s", e)

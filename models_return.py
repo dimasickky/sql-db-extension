@@ -1,42 +1,60 @@
-"""sql-db · Typed return models for @chat.function data_model= contracts (SDK 5.0.1)."""
+"""sql-db · Typed return models for @chat.function data_model= contracts (SDK 5.2.0 SDL)."""
 
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel
+
+from imperal_sdk import sdl
+
+
+# ─── Shared primitives ────────────────────────────────────────────────────── #
+
+class TableColumnDetail(BaseModel):
+    name: str
+    type: str
+    nullable: str
+    key: str
+    default: Optional[str] = None
+    extra: str = ""
+
+
+class TableIndexDetail(BaseModel):
+    name: str
+    unique: bool
+    columns: list[str]
+
+
+# ─── SDL Entity types (SDK 5.2.0) ─────────────────────────────────────────── #
+
+class ConnectionEntity(sdl.Entity):
+    """SDL DB connection. id=connection_id (UUID), title=name, kind="connection"."""
+    host: str = ""
+    database: str = ""
+    is_active: bool = False
+    server_version: str = ""
+    databases: list[str] = []
+
+
+class TableEntity(sdl.Entity):
+    """SDL DB table. id=table_name, title=table_name, kind="table"."""
+    database: str = ""
+    exists: bool = True
+    type: str = "BASE TABLE"
+    engine: str = ""
+    rows_estimate: int = 0
+    columns: list[TableColumnDetail] = []
+    indexes: list[TableIndexDetail] = []
 
 
 # ─── handlers_connections ─────────────────────────────────────────────────── #
 
-class AddConnectionResult(BaseModel):
-    connection_id: str
-    name: str
-    version: str
-    databases: list[str]
-
-
-class ConnectionItem(BaseModel):
-    connection_id: str
-    name: str
-    host: str
-    database: str
-    is_active: bool
-    server_version: str
-
-
 class ListConnectionsResult(BaseModel):
-    connections: list[ConnectionItem]
+    connections: list[ConnectionEntity]
     total: int
 
 
-class ResolveConnectionResult(BaseModel):
-    connection_id: str
-    database: str
-    name: str
-    host: str
-
-
 class TestConnectionResult(BaseModel):
-    version: str | None
+    version: Optional[str]
     databases: list[str]
 
 
@@ -59,18 +77,15 @@ class SqlExecuteResult(BaseModel):
 
 
 class RunEditorSqlResult(BaseModel):
-    # DML/DDL branch
-    rows_affected: int | None = None
-    query_type: str | None = None
-    tables: list[Any] | None = None
-    exec_ms: int | None = None
-    # EXPLAIN branch
-    plan: list[Any] | None = None
-    sql: str | None = None
-    # SELECT branch
-    columns: list[str] | None = None
-    rows: list[Any] | None = None
-    total_rows: int | None = None
+    rows_affected: Optional[int] = None
+    query_type: Optional[str] = None
+    tables: Optional[list[Any]] = None
+    exec_ms: Optional[int] = None
+    plan: Optional[list[Any]] = None
+    sql: Optional[str] = None
+    columns: Optional[list[str]] = None
+    rows: Optional[list[Any]] = None
+    total_rows: Optional[int] = None
 
 
 # ─── handlers_history ─────────────────────────────────────────────────────── #
@@ -81,7 +96,7 @@ class ListHistoryResult(BaseModel):
 
 
 class SaveQueryResult(BaseModel):
-    query_id: str | None
+    query_id: Optional[str]
     name: str
 
 
@@ -172,32 +187,6 @@ class TableListItem(BaseModel):
 
 class ListTablesResult(BaseModel):
     database: str
-    total_matching: int  # count of tables matching search, NOT total tables in DB
+    total_matching: int
     search: str
     tables: list[TableListItem]
-
-
-class TableColumnDetail(BaseModel):
-    name: str
-    type: str
-    nullable: str
-    key: str
-    default: str | None = None
-    extra: str = ""
-
-
-class TableIndexDetail(BaseModel):
-    name: str
-    unique: bool
-    columns: list[str]
-
-
-class GetTableDetailResult(BaseModel):
-    database: str
-    table: str
-    exists: bool
-    type: str = ""
-    engine: str = ""
-    rows_estimate: int = 0
-    columns: list[TableColumnDetail]
-    indexes: list[TableIndexDetail]

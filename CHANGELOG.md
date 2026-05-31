@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.16.0] — 2026-05-31
+
+### Changed
+
+- **SDL migration (SDK 5.2.0).** `ConnectionEntity` (sdl.Entity) replaces `AddConnectionResult`
+  and `ResolveConnectionResult` for `add_connection` and `resolve_connection_by_database`.
+  `ListConnectionsResult.connections` now contains `ConnectionEntity` items.
+  `TableEntity` (sdl.Entity) replaces `GetTableDetailResult` for `get_table_detail`.
+  All entities carry canonical `id`/`title`/`kind` fields read by kernel entity focus.
+- **SDK bump** `5.0.2` → `5.2.0`.
+- `models_return` added to `main.py` hot-reload purge list.
+
 ## [2.15.1] — 2026-05-27
 
 ### Fixed

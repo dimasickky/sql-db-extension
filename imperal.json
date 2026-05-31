@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.0.2",
+  "sdk_version": "5.2.0",
   "app_id": "sql-db",
-  "version": "2.15.1",
+  "version": "2.16.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -89,20 +89,98 @@
         "type": "object"
       },
       "return_schema": {
+        "description": "SDL DB connection. id=connection_id (UUID), title=name, kind=\"connection\".",
         "properties": {
-          "connection_id": {
-            "title": "Connection Id",
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
             "type": "string"
           },
-          "name": {
-            "title": "Name",
+          "kind": {
+            "default": "",
+            "title": "Kind",
             "type": "string"
           },
-          "version": {
-            "title": "Version",
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "host": {
+            "default": "",
+            "title": "Host",
+            "type": "string"
+          },
+          "database": {
+            "default": "",
+            "title": "Database",
+            "type": "string"
+          },
+          "is_active": {
+            "default": false,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "server_version": {
+            "default": "",
+            "title": "Server Version",
             "type": "string"
           },
           "databases": {
+            "default": [],
             "items": {
               "type": "string"
             },
@@ -111,13 +189,12 @@
           }
         },
         "required": [
-          "connection_id",
-          "name",
-          "version",
-          "databases"
+          "id",
+          "title"
         ],
-        "title": "AddConnectionResult",
-        "type": "object"
+        "title": "ConnectionEntity",
+        "type": "object",
+        "x-sdl": "entity"
       },
       "event": "connection.added",
       "background": false,
@@ -140,49 +217,119 @@
       },
       "return_schema": {
         "$defs": {
-          "ConnectionItem": {
+          "ConnectionEntity": {
+            "description": "SDL DB connection. id=connection_id (UUID), title=name, kind=\"connection\".",
             "properties": {
-              "connection_id": {
-                "title": "Connection Id",
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
                 "type": "string"
               },
-              "name": {
-                "title": "Name",
+              "kind": {
+                "default": "",
+                "title": "Kind",
                 "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
               },
               "host": {
+                "default": "",
                 "title": "Host",
                 "type": "string"
               },
               "database": {
+                "default": "",
                 "title": "Database",
                 "type": "string"
               },
               "is_active": {
+                "default": false,
                 "title": "Is Active",
                 "type": "boolean"
               },
               "server_version": {
+                "default": "",
                 "title": "Server Version",
                 "type": "string"
+              },
+              "databases": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Databases",
+                "type": "array"
               }
             },
             "required": [
-              "connection_id",
-              "name",
-              "host",
-              "database",
-              "is_active",
-              "server_version"
+              "id",
+              "title"
             ],
-            "title": "ConnectionItem",
-            "type": "object"
+            "title": "ConnectionEntity",
+            "type": "object",
+            "x-sdl": "entity"
           }
         },
         "properties": {
           "connections": {
             "items": {
-              "$ref": "#/$defs/ConnectionItem"
+              "$ref": "#/$defs/ConnectionEntity"
             },
             "title": "Connections",
             "type": "array"
@@ -228,32 +375,112 @@
         "type": "object"
       },
       "return_schema": {
+        "description": "SDL DB connection. id=connection_id (UUID), title=name, kind=\"connection\".",
         "properties": {
-          "connection_id": {
-            "title": "Connection Id",
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "host": {
+            "default": "",
+            "title": "Host",
             "type": "string"
           },
           "database": {
+            "default": "",
             "title": "Database",
             "type": "string"
           },
-          "name": {
-            "title": "Name",
+          "is_active": {
+            "default": false,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "server_version": {
+            "default": "",
+            "title": "Server Version",
             "type": "string"
           },
-          "host": {
-            "title": "Host",
-            "type": "string"
+          "databases": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Databases",
+            "type": "array"
           }
         },
         "required": [
-          "connection_id",
-          "database",
-          "name",
-          "host"
+          "id",
+          "title"
         ],
-        "title": "ResolveConnectionResult",
-        "type": "object"
+        "title": "ConnectionEntity",
+        "type": "object",
+        "x-sdl": "entity"
       },
       "event": "",
       "background": false,
@@ -931,21 +1158,88 @@
             "type": "object"
           }
         },
+        "description": "SDL DB table. id=table_name, title=table_name, kind=\"table\".",
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
           "database": {
+            "default": "",
             "title": "Database",
             "type": "string"
           },
-          "table": {
-            "title": "Table",
-            "type": "string"
-          },
           "exists": {
+            "default": true,
             "title": "Exists",
             "type": "boolean"
           },
           "type": {
-            "default": "",
+            "default": "BASE TABLE",
             "title": "Type",
             "type": "string"
           },
@@ -960,6 +1254,7 @@
             "type": "integer"
           },
           "columns": {
+            "default": [],
             "items": {
               "$ref": "#/$defs/TableColumnDetail"
             },
@@ -967,6 +1262,7 @@
             "type": "array"
           },
           "indexes": {
+            "default": [],
             "items": {
               "$ref": "#/$defs/TableIndexDetail"
             },
@@ -975,14 +1271,12 @@
           }
         },
         "required": [
-          "database",
-          "table",
-          "exists",
-          "columns",
-          "indexes"
+          "id",
+          "title"
         ],
-        "title": "GetTableDetailResult",
-        "type": "object"
+        "title": "TableEntity",
+        "type": "object",
+        "x-sdl": "entity"
       },
       "event": "",
       "background": false,

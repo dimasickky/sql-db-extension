@@ -97,7 +97,7 @@ class ResolveConnByDbParams(BaseModel):
     effects=["create:connection"],
     event="connection.added",
     description="Add a new MySQL/MariaDB connection. Tests connectivity before saving.",
-    data_model=AddConnectionResult,
+    data_model=ConnectionEntity,
 )
 async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
     uid = require_user_id(ctx)
@@ -134,10 +134,18 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
             "is_active": True,
         })
 
+        entity = ConnectionEntity(
+            id=doc.id,
+            title=name,
+            kind="connection",
+            host=params.host,
+            database=params.database,
+            is_active=True,
+            server_version=result.get("version", ""),
+            databases=result.get("databases", []),
+        )
         return ActionResult.success(
-            data={"connection_id": doc.id, "name": name,
-                  "version": result.get("version", ""),
-                  "databases": result.get("databases", [])},
+            data=entity,
             summary=f"Connected to {params.host} ({result.get('version', '')})",
         )
     except Exception as e:
@@ -155,14 +163,18 @@ async def fn_list_connections(ctx, params: NoParams) -> ActionResult:
     uid = require_user_id(ctx)
     try:
         page = await ctx.store.query(CONN_COLLECTION, where={"user_id": uid}, limit=100)
-        connections = [{
-            "connection_id":  doc.id,
-            "name":           doc.data.get("name", ""),
-            "host":           doc.data.get("host", ""),
-            "database":       doc.data.get("database", ""),
-            "is_active":      doc.data.get("is_active", False),
-            "server_version": doc.data.get("server_version", ""),
-        } for doc in page.data]
+        connections = [
+            ConnectionEntity(
+                id=doc.id,
+                title=doc.data.get("name", ""),
+                kind="connection",
+                host=doc.data.get("host", ""),
+                database=doc.data.get("database", ""),
+                is_active=doc.data.get("is_active", False),
+                server_version=doc.data.get("server_version", ""),
+            )
+            for doc in page.data
+        ]
         return ActionResult.success(
             data={"connections": connections, "total": len(connections)},
             summary=f"Found {len(connections)} connection(s)",
@@ -181,7 +193,7 @@ async def fn_list_connections(ctx, params: NoParams) -> ActionResult:
         "e.g. resolve_connection_by_database(database_name='ijodghbk_test') "
         "-> pass the returned connection_id into the next step."
     ),
-    data_model=ResolveConnectionResult,
+    data_model=ConnectionEntity,
 )
 async def fn_resolve_connection_by_database(
     ctx, params: ResolveConnByDbParams,
@@ -214,9 +226,17 @@ async def fn_resolve_connection_by_database(
             return ActionResult.error(
                 f"No connection found for '{target}'. Available: {available or '(none)'}"
             )
+        entity = ConnectionEntity(
+            id=exact.id,
+            title=exact.data.get("name", ""),
+            kind="connection",
+            host=exact.data.get("host", ""),
+            database=exact.data.get("database", ""),
+            is_active=exact.data.get("is_active", False),
+            server_version=exact.data.get("server_version", ""),
+        )
         return ActionResult.success(
-            data={"connection_id": exact.id, "database": exact.data.get("database", ""),
-                  "name": exact.data.get("name", ""), "host": exact.data.get("host", "")},
+            data=entity,
             summary=f"connection_id={exact.id} for {target}",
         )
     except Exception as e:
