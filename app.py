@@ -51,6 +51,12 @@ def _translate_db_error(detail: str) -> str:
     """
     if not detail:
         return detail
+    if "Multi-statement" in detail:
+        return (
+            "This request has multiple SQL statements. Call execute_batch(sql=...) "
+            "with the full script to run them together in one transaction, or send "
+            "one statement per execute_sql call."
+        )
     m = _MYSQL_CODE_RE.match(detail.strip())
     if not m:
         return detail
@@ -285,7 +291,7 @@ def build_conn_info(conn: dict) -> dict:
 
 ext = Extension(
     "sql-db",
-    version="2.17.0",
+    version="2.18.0",
     capabilities=["sql-db:read", "sql-db:write"],
     display_name="SQL Database",
     description=(

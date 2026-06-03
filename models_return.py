@@ -110,6 +110,20 @@ class RunEditorSqlResult(BaseModel):
     total_rows: Optional[int] = None
 
 
+class BatchStatementResult(BaseModel):
+    query_type: str
+    is_destructive: bool = False
+    tables: list[Any] = []
+
+
+class BatchExecuteResult(BaseModel):
+    """execute_batch — multiple statements run sequentially in ONE transaction."""
+    statements_executed: int
+    rows_affected: int = 0
+    exec_ms: int = 0
+    statements: list[BatchStatementResult] = []
+
+
 # ─── handlers_history ─────────────────────────────────────────────────────── #
 
 class ListHistoryResult(sdl.EntityList[HistoryEntity]):

@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.18.0] — 2026-06-03
+
+### Added
+
+- **`execute_batch(sql)`** — run several SQL statements in one call (e.g. create a table and seed
+  it, or create multiple tables). Statements run sequentially in a single transaction.
+
+### Changed
+
+- `system_prompt.txt`: multi-statement / "create and fill" requests now route to `execute_batch`.
+- Clearer guidance when several statements are sent to `execute_sql` (use `execute_batch` instead).
+
 ## [2.17.0] — 2026-06-03
 
 ### Changed

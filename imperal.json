@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.2.0",
   "app_id": "sql-db",
-  "version": "2.17.0",
+  "version": "2.18.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -1621,6 +1621,100 @@
           }
         },
         "title": "RunEditorSqlResult",
+        "type": "object"
+      },
+      "event": "sql.executed",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "execute_batch",
+      "description": "Run MULTIPLE SQL statements at once, sequentially, in ONE transaction. Use this when the user asks to create a table AND fill it, create several tables, or run a multi-statement script — instead of multiple execute_sql calls (execute_sql rejects multi-statement). Pass the whole script in `sql` (statements separated by ';'). Note: DDL (CREATE/ALTER/DROP) auto-commits and cannot be rolled back; DML is transactional.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "execute:sql"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Run MULTIPLE SQL statements together (e.g. CREATE a table AND seed it).",
+        "properties": {
+          "sql": {
+            "description": "A SQL script with MULTIPLE statements separated by ';' (e.g. 'CREATE TABLE ...; INSERT ...; CREATE TABLE ...;'). Runs sequentially in one transaction.",
+            "title": "Sql",
+            "type": "string"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql"
+        ],
+        "title": "ExecuteBatchParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "BatchStatementResult": {
+            "properties": {
+              "query_type": {
+                "title": "Query Type",
+                "type": "string"
+              },
+              "is_destructive": {
+                "default": false,
+                "title": "Is Destructive",
+                "type": "boolean"
+              },
+              "tables": {
+                "default": [],
+                "items": {},
+                "title": "Tables",
+                "type": "array"
+              }
+            },
+            "required": [
+              "query_type"
+            ],
+            "title": "BatchStatementResult",
+            "type": "object"
+          }
+        },
+        "description": "execute_batch — multiple statements run sequentially in ONE transaction.",
+        "properties": {
+          "statements_executed": {
+            "title": "Statements Executed",
+            "type": "integer"
+          },
+          "rows_affected": {
+            "default": 0,
+            "title": "Rows Affected",
+            "type": "integer"
+          },
+          "exec_ms": {
+            "default": 0,
+            "title": "Exec Ms",
+            "type": "integer"
+          },
+          "statements": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/BatchStatementResult"
+            },
+            "title": "Statements",
+            "type": "array"
+          }
+        },
+        "required": [
+          "statements_executed"
+        ],
+        "title": "BatchExecuteResult",
         "type": "object"
       },
       "event": "sql.executed",

@@ -328,3 +328,91 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
     except Exception as e:
         log.error("run_editor_sql: %s", e)
         return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+
+
+# ─── execute_batch — multiple statements in ONE transaction ──────────────── #
+
+class ExecuteBatchParams(BaseModel):
+    """Run MULTIPLE SQL statements together (e.g. CREATE a table AND seed it)."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    sql: str = Field(
+        validation_alias=_SQL_ALIASES,
+        description=(
+            "A SQL script with MULTIPLE statements separated by ';' "
+            "(e.g. 'CREATE TABLE ...; INSERT ...; CREATE TABLE ...;'). "
+            "Runs sequentially in one transaction."
+        ),
+    )
+    connection_id: str = Field(
+        default="", validation_alias=_CONN_ALIASES,
+        description="Connection ID (empty = active)",
+    )
+
+
+@chat.function(
+    "execute_batch", action_type="destructive", chain_callable=True,
+    effects=["execute:sql"], event="sql.executed",
+    data_model=BatchExecuteResult,
+    description=(
+        "Run MULTIPLE SQL statements at once, sequentially, in ONE transaction. "
+        "Use this when the user asks to create a table AND fill it, create several "
+        "tables, or run a multi-statement script — instead of multiple execute_sql "
+        "calls (execute_sql rejects multi-statement). Pass the whole script in `sql` "
+        "(statements separated by ';'). Note: DDL (CREATE/ALTER/DROP) auto-commits "
+        "and cannot be rolled back; DML is transactional."
+    ),
+)
+async def fn_execute_batch(ctx, params: ExecuteBatchParams) -> ActionResult:
+    """Split a multi-statement script and run it as one transactional batch."""
+    try:
+        sql = (params.sql or "").strip()
+        if not sql:
+            return ActionResult.error("execute_batch: sql parameter is empty")
+
+        conn, conn_id = await _resolve(ctx, params.connection_id or "")
+        if not conn:
+            return ActionResult.error(
+                f"No connection resolved (connection_id='{params.connection_id}')."
+            )
+
+        result = await _api_post(ctx, f"/v1/connections/{conn_id}/execute_batch", {
+            "user_id": require_user_id(ctx),
+            "sql": sql,
+            "confirmed": True,
+            "connection": build_conn_info(conn),
+        })
+
+        if result.get("status") != "ok":
+            return ActionResult.error(_translate_db_error(result.get("detail", "Batch execution failed")))
+
+        stmts = result.get("statements", []) or []
+
+        # DDL changed the schema shape — drop the cached snapshot so the next
+        # write re-reads a fresh skeleton (same rationale as execute_sql).
+        if any((s.get("query_type") or "").upper() in _DDL_VERBS for s in stmts):
+            await invalidate_schema_cache(ctx)
+
+        # Best-effort sidebar liveness — a batch touched schema/data.
+        try:
+            await ctx.events.emit("sql.ddl_executed", {
+                "conn_id": conn_id, "database": conn.get("database", ""),
+                "kind": "batch", "target_table": None,
+            })
+        except Exception as exc:
+            log.warning("execute_batch sidebar emit failed (non-fatal): %s", exc)
+
+        n = result.get("statements_executed", len(stmts))
+        rows = result.get("rows_affected", 0)
+        return ActionResult.success(
+            data={
+                "statements_executed": n,
+                "rows_affected": rows,
+                "exec_ms": result.get("exec_ms", 0),
+                "statements": stmts,
+            },
+            summary=f"Batch: {n} statement(s) executed, {rows} row(s) affected.",
+        )
+    except Exception as e:
+        log.error("execute_batch: %s", e)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
