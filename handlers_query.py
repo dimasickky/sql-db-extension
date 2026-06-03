@@ -402,36 +402,37 @@ async def fn_list_tables(ctx, params: ListTablesParams) -> ActionResult:
         if result.get("status") != "ok":
             return ActionResult.error(result.get("detail", "Couldn't list tables"))
 
-        items = result.get("items", [])
-        table_list = [
-            {
-                "name":          t["name"],
-                "type":          t.get("type", "BASE TABLE"),
-                "rows_estimate": t.get("rows_estimate", 0),
-                "size_bytes":    t.get("size_bytes", 0),
-            }
-            for t in items
+        backend_items = result.get("items", [])
+        table_items = [
+            TableListEntity(
+                id=t["name"], title=t["name"], kind="table",
+                type=t.get("type") or "BASE TABLE",
+                rows_estimate=t.get("rows_estimate") or 0,
+                size_bytes=t.get("size_bytes") or 0,
+            ).model_dump()
+            for t in backend_items
         ]
-        total_matching = result.get("total_count", len(items))
+        total_matching = result.get("total_count", len(backend_items))
         if params.search:
             summary = (
                 f"Found {total_matching} table(s) matching '{params.search}', "
-                f"showing {len(table_list)}. "
+                f"showing {len(table_items)}. "
                 f"Call get_table_detail(table='<name>') to get columns before querying."
             )
         else:
             summary = (
-                f"{len(table_list)} of {total_matching} total table(s) in '{database}'. "
+                f"{len(table_items)} of {total_matching} total table(s) in '{database}'. "
                 f"Use search= to filter by name. "
                 f"Call get_table_detail(table='<name>') to get columns before querying."
             )
         return ActionResult.success(
             summary=summary,
             data={
+                "items":          table_items,
+                "total":          total_matching,
                 "database":       database,
                 "total_matching": total_matching,  # count of tables matching search filter
                 "search":         params.search,
-                "tables":         table_list,
             },
         )
     except Exception as e:

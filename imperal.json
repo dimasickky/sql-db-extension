@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.2.0",
   "app_id": "sql-db",
-  "version": "2.16.0",
+  "version": "2.17.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -326,25 +326,51 @@
             "x-sdl": "entity"
           }
         },
+        "description": "list_connections — a REAL sdl.EntityList[ConnectionEntity] (items=[...], total=N,\nx-sdl='entity-list').",
         "properties": {
-          "connections": {
+          "items": {
             "items": {
               "$ref": "#/$defs/ConnectionEntity"
             },
-            "title": "Connections",
+            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
           }
         },
         "required": [
-          "connections",
-          "total"
+          "items"
         ],
         "title": "ListConnectionsResult",
-        "type": "object"
+        "type": "object",
+        "x-sdl": "entity-list"
       },
       "event": "",
       "background": false,
@@ -986,64 +1012,162 @@
       },
       "return_schema": {
         "$defs": {
-          "TableListItem": {
+          "TableListEntity": {
+            "description": "Slim SDL table entity for list_tables results. id=title=table name, kind=\"table\".",
             "properties": {
-              "name": {
-                "title": "Name",
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
                 "type": "string"
               },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
               "type": {
+                "default": "BASE TABLE",
                 "title": "Type",
                 "type": "string"
               },
               "rows_estimate": {
+                "default": 0,
                 "title": "Rows Estimate",
                 "type": "integer"
               },
               "size_bytes": {
+                "default": 0,
                 "title": "Size Bytes",
                 "type": "integer"
               }
             },
             "required": [
-              "name",
-              "type",
-              "rows_estimate",
-              "size_bytes"
+              "id",
+              "title"
             ],
-            "title": "TableListItem",
-            "type": "object"
+            "title": "TableListEntity",
+            "type": "object",
+            "x-sdl": "entity"
           }
         },
+        "description": "list_tables — a REAL sdl.EntityList[TableListEntity] (items=[...], x-sdl='entity-list');\ndatabase / total_matching / search carried as additive typed fields.",
         "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/TableListEntity"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
           "database": {
+            "default": "",
             "title": "Database",
             "type": "string"
           },
           "total_matching": {
+            "default": 0,
             "title": "Total Matching",
             "type": "integer"
           },
           "search": {
+            "default": "",
             "title": "Search",
             "type": "string"
-          },
-          "tables": {
-            "items": {
-              "$ref": "#/$defs/TableListItem"
-            },
-            "title": "Tables",
-            "type": "array"
           }
         },
         "required": [
-          "database",
-          "total_matching",
-          "search",
-          "tables"
+          "items"
         ],
         "title": "ListTablesResult",
-        "type": "object"
+        "type": "object",
+        "x-sdl": "entity-list"
       },
       "event": "",
       "background": false,
@@ -1589,23 +1713,158 @@
         "type": "object"
       },
       "return_schema": {
+        "$defs": {
+          "HistoryEntity": {
+            "description": "SDL query-history entry. id=history id, title=SQL snippet, kind=\"query_history\".",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "sql_text": {
+                "default": "",
+                "title": "Sql Text",
+                "type": "string"
+              },
+              "query_type": {
+                "default": "",
+                "title": "Query Type",
+                "type": "string"
+              },
+              "rows_affected": {
+                "default": 0,
+                "title": "Rows Affected",
+                "type": "integer"
+              },
+              "exec_ms": {
+                "default": 0,
+                "title": "Exec Ms",
+                "type": "integer"
+              },
+              "created_at": {
+                "default": "",
+                "title": "Created At",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "HistoryEntity",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "list_history — a REAL sdl.EntityList[HistoryEntity] (items=[...], total=N).",
         "properties": {
-          "history": {
-            "items": {},
-            "title": "History",
+          "items": {
+            "items": {
+              "$ref": "#/$defs/HistoryEntity"
+            },
+            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
           }
         },
         "required": [
-          "history",
-          "total"
+          "items"
         ],
         "title": "ListHistoryResult",
-        "type": "object"
+        "type": "object",
+        "x-sdl": "entity-list"
       },
       "event": "",
       "background": false,
@@ -1707,23 +1966,138 @@
         "type": "object"
       },
       "return_schema": {
+        "$defs": {
+          "SavedQueryEntity": {
+            "description": "SDL saved query. id=query_id, title=name, kind=\"saved_query\".",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Url"
+              },
+              "sql_text": {
+                "default": "",
+                "title": "Sql Text",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "SavedQueryEntity",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "description": "list_saved — a REAL sdl.EntityList[SavedQueryEntity] (items=[...], total=N).",
         "properties": {
-          "saved_queries": {
-            "items": {},
-            "title": "Saved Queries",
+          "items": {
+            "items": {
+              "$ref": "#/$defs/SavedQueryEntity"
+            },
+            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
           }
         },
         "required": [
-          "saved_queries",
-          "total"
+          "items"
         ],
         "title": "ListSavedResult",
-        "type": "object"
+        "type": "object",
+        "x-sdl": "entity-list"
       },
       "event": "",
       "background": false,

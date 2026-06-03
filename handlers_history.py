@@ -98,9 +98,23 @@ async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
             {"user_id": require_user_id(ctx), "limit": params.limit},
         )
 
+        hist = result.get("history", [])
+        items = [
+            HistoryEntity(
+                id=str(h.get("id") or ""),
+                title=(h.get("sql_text") or "")[:80] or "(query)",
+                kind="query_history",
+                sql_text=h.get("sql_text") or "",
+                query_type=h.get("query_type") or "",
+                rows_affected=h.get("rows_affected") or 0,
+                exec_ms=h.get("exec_ms") or 0,
+                created_at=h.get("created_at") or "",
+            ).model_dump()
+            for h in hist
+        ]
         return ActionResult.success(
-            data={"history": result.get("history", []), "total": result.get("total", 0)},
-            summary=f"{result.get('total', 0)} queries in history",
+            data={"items": items, "total": result.get("total", len(items))},
+            summary=f"{result.get('total', len(items))} queries in history",
         )
     except Exception as e:
         log.error("list_history: %s", e)
@@ -153,9 +167,18 @@ async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
         )
 
         queries = result.get("saved_queries", [])
+        items = [
+            SavedQueryEntity(
+                id=str(q.get("id") or ""),
+                title=q.get("name") or "(unnamed)",
+                kind="saved_query",
+                sql_text=q.get("sql_text") or "",
+            ).model_dump()
+            for q in queries
+        ]
         return ActionResult.success(
-            data={"saved_queries": queries, "total": len(queries)},
-            summary=f"{len(queries)} saved query(ies)",
+            data={"items": items, "total": len(items)},
+            summary=f"{len(items)} saved query(ies)",
         )
     except Exception as e:
         log.error("list_saved: %s", e)

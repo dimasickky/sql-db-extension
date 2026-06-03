@@ -163,7 +163,7 @@ async def fn_list_connections(ctx, params: NoParams) -> ActionResult:
     uid = require_user_id(ctx)
     try:
         page = await ctx.store.query(CONN_COLLECTION, where={"user_id": uid}, limit=100)
-        connections = [
+        items = [
             ConnectionEntity(
                 id=doc.id,
                 title=doc.data.get("name", ""),
@@ -172,12 +172,12 @@ async def fn_list_connections(ctx, params: NoParams) -> ActionResult:
                 database=doc.data.get("database", ""),
                 is_active=doc.data.get("is_active", False),
                 server_version=doc.data.get("server_version", ""),
-            )
+            ).model_dump()
             for doc in page.data
         ]
         return ActionResult.success(
-            data={"connections": connections, "total": len(connections)},
-            summary=f"Found {len(connections)} connection(s)",
+            data={"items": items, "total": len(items)},
+            summary=f"Found {len(items)} connection(s)",
         )
     except Exception as e:
         log.error("list_connections: %s", e)

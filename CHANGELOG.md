@@ -6,6 +6,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.17.0] — 2026-06-03
+
+### Changed
+
+- **SDL: entity-collection reads now return real `sdl.EntityList[…]`** (`items=[...]`,
+  `x-sdl="entity-list"`), mirroring the tasks v3.31.0 / notes v3.13.0 migration:
+  `list_connections` → `sdl.EntityList[ConnectionEntity]`, `list_tables` →
+  `sdl.EntityList[TableListEntity]`, `list_saved` → `sdl.EntityList[SavedQueryEntity]`,
+  `list_history` → `sdl.EntityList[HistoryEntity]`. Legacy list keys (`connections` / `tables` /
+  `saved_queries` / `history`) are replaced by the canonical `items`; report fields
+  (`database`, `total_matching`, `search`) are kept as additive typed fields (`total` inherited).
+- **New SDL entity types** `TableListEntity` (id=table name), `SavedQueryEntity` (id=query_id,
+  title=name), `HistoryEntity` (id=history id, title=SQL snippet). `list_saved`/`list_history`
+  previously emitted `list[Any]` raw backend dicts; they are now mapped to canonical SDL entities
+  and `model_dump()`-ed to plain dicts.
+- **Why:** the kernel captures a cross-turn salient set / resolves anaphora ("удали это
+  подключение", "переключись на вторую", "структуру этой таблицы") / offers proactive set-actions
+  ONLY from results it recognizes as an SDL entity-list (`x-sdl` return-schema marker for singular
+  focus; structural `data["items"]` detector for plural/offer). The legacy keys matched neither.
+
+### Unchanged (deliberate)
+
+- **`get_schema`** stays a structured schema report (`tables` = full column/index detail in the
+  backend's `COLUMN_NAME`/… shape, consumed as schema context by nlq / renderers / schema-guard).
+  Table anaphora is served by the now-canonical `list_tables`; converting the schema dump would add
+  no anaphora value and risk the column-key mapping.
+- **Query results** — `run_query` / `execute_sql` / `explain_query` / `run_saved` (`rows`,
+  `columns`, `plan`) remain plain typed results: arbitrary tabular/EXPLAIN data with no stable
+  id/title/kind is NOT an SDL entity collection.
+
+### Notes
+
+- Pure extension-side change; the the backend wire contract is unchanged. Panels / skeleton /
+  schema-guard read the backend response (`{"tables":[…]}` / `{"history":[…]}` / `{"saved_queries":[…]}`)
+  and the cached schema snapshot directly, NOT the chat-tool result — no panel/skeleton blast radius.
+
+---
+
 ## [2.16.0] — 2026-05-31
 
 ### Changed

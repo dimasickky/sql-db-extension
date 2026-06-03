@@ -46,11 +46,33 @@ class TableEntity(sdl.Entity):
     indexes: list[TableIndexDetail] = []
 
 
+class TableListEntity(sdl.Entity):
+    """Slim SDL table entity for list_tables results. id=title=table name, kind="table"."""
+    type: str = "BASE TABLE"
+    rows_estimate: int = 0
+    size_bytes: int = 0
+
+
+class SavedQueryEntity(sdl.Entity):
+    """SDL saved query. id=query_id, title=name, kind="saved_query"."""
+    sql_text: str = ""
+
+
+class HistoryEntity(sdl.Entity):
+    """SDL query-history entry. id=history id, title=SQL snippet, kind="query_history"."""
+    sql_text: str = ""
+    query_type: str = ""
+    rows_affected: int = 0
+    exec_ms: int = 0
+    created_at: str = ""
+
+
 # ─── handlers_connections ─────────────────────────────────────────────────── #
 
-class ListConnectionsResult(BaseModel):
-    connections: list[ConnectionEntity]
-    total: int
+class ListConnectionsResult(sdl.EntityList[ConnectionEntity]):
+    """list_connections — a REAL sdl.EntityList[ConnectionEntity] (items=[...], total=N,
+    x-sdl='entity-list')."""
+    pass
 
 
 class TestConnectionResult(BaseModel):
@@ -90,9 +112,9 @@ class RunEditorSqlResult(BaseModel):
 
 # ─── handlers_history ─────────────────────────────────────────────────────── #
 
-class ListHistoryResult(BaseModel):
-    history: list[Any]
-    total: int
+class ListHistoryResult(sdl.EntityList[HistoryEntity]):
+    """list_history — a REAL sdl.EntityList[HistoryEntity] (items=[...], total=N)."""
+    pass
 
 
 class SaveQueryResult(BaseModel):
@@ -100,9 +122,9 @@ class SaveQueryResult(BaseModel):
     name: str
 
 
-class ListSavedResult(BaseModel):
-    saved_queries: list[Any]
-    total: int
+class ListSavedResult(sdl.EntityList[SavedQueryEntity]):
+    """list_saved — a REAL sdl.EntityList[SavedQueryEntity] (items=[...], total=N)."""
+    pass
 
 
 class RunSavedResult(BaseModel):
@@ -178,15 +200,9 @@ class CountTableResult(BaseModel):
     exec_ms: int
 
 
-class TableListItem(BaseModel):
-    name: str
-    type: str
-    rows_estimate: int
-    size_bytes: int
-
-
-class ListTablesResult(BaseModel):
-    database: str
-    total_matching: int
-    search: str
-    tables: list[TableListItem]
+class ListTablesResult(sdl.EntityList[TableListEntity]):
+    """list_tables — a REAL sdl.EntityList[TableListEntity] (items=[...], x-sdl='entity-list');
+    database / total_matching / search carried as additive typed fields."""
+    database: str = ""
+    total_matching: int = 0
+    search: str = ""
