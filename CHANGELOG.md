@@ -33,26 +33,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
   title=name), `HistoryEntity` (id=history id, title=SQL snippet). `list_saved`/`list_history`
   previously emitted `list[Any]` raw backend dicts; they are now mapped to canonical SDL entities
   and `model_dump()`-ed to plain dicts.
-- **Why:** the kernel captures a cross-turn salient set / resolves anaphora ("удали это
+- **Why:** the platform recognizes a cross-turn focus set / resolves anaphora ("удали это
   подключение", "переключись на вторую", "структуру этой таблицы") / offers proactive set-actions
-  ONLY from results it recognizes as an SDL entity-list (`x-sdl` return-schema marker for singular
-  focus; structural `data["items"]` detector for plural/offer). The legacy keys matched neither.
+  ONLY from results it recognizes as an SDL entity-list. The legacy list keys matched neither, so
+  these conveniences now work for connections, tables, saved queries, and history.
 
 ### Unchanged (deliberate)
 
-- **`get_schema`** stays a structured schema report (`tables` = full column/index detail in the
-  backend's `COLUMN_NAME`/… shape, consumed as schema context by nlq / renderers / schema-guard).
-  Table anaphora is served by the now-canonical `list_tables`; converting the schema dump would add
-  no anaphora value and risk the column-key mapping.
+- **`get_schema`** stays a structured schema report (`tables` = full column/index detail),
+  consumed as schema context by NL→SQL, renderers, and the write-time schema guard. Table
+  anaphora is served by the now-canonical `list_tables`; converting the schema dump would add
+  no anaphora value.
 - **Query results** — `run_query` / `execute_sql` / `explain_query` / `run_saved` (`rows`,
   `columns`, `plan`) remain plain typed results: arbitrary tabular/EXPLAIN data with no stable
   id/title/kind is NOT an SDL entity collection.
 
 ### Notes
 
-- Pure extension-side change; the the backend wire contract is unchanged. Panels / skeleton /
-  schema-guard read the backend response (`{"tables":[…]}` / `{"history":[…]}` / `{"saved_queries":[…]}`)
-  and the cached schema snapshot directly, NOT the chat-tool result — no panel/skeleton blast radius.
+- Pure extension-side change; the backend wire contract is unchanged. Panels, skeleton, and the
+  schema guard read the backend response and the cached schema snapshot directly, NOT the
+  chat-tool result — no panel/skeleton blast radius.
 
 ---
 
@@ -64,7 +64,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
   and `ResolveConnectionResult` for `add_connection` and `resolve_connection_by_database`.
   `ListConnectionsResult.connections` now contains `ConnectionEntity` items.
   `TableEntity` (sdl.Entity) replaces `GetTableDetailResult` for `get_table_detail`.
-  All entities carry canonical `id`/`title`/`kind` fields read by kernel entity focus.
+  All entities carry canonical `id`/`title`/`kind` fields read by the platform's entity focus.
 - **SDK bump** `5.0.2` → `5.2.0`.
 - `models_return` added to `main.py` hot-reload purge list.
 
@@ -88,7 +88,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [2.14.0] — 2026-05-18
 
 ### Fixed
-- **`nl_to_sql` — reverted to `ctx.ai.complete()` per SDK contract** — v2.8.0 switched to `ctx.llm.create_message()` as a workaround for BYOLLM users; however the SDK contract designates `ctx.ai` as the correct AI completion surface (maps to the platform's model routing, including BYOLLM when configured and fallback to platform default otherwise). Reverted to `ctx.ai.complete(prompt)` which is the federally correct call.
+- **`nl_to_sql` — reverted to `ctx.ai.complete()` per SDK contract** — v2.8.0 switched to `ctx.llm.create_message()` as a workaround for BYOLLM users; however the SDK contract designates `ctx.ai` as the correct AI completion surface (maps to the platform's model routing, including BYOLLM when configured and fallback to platform default otherwise). Reverted to `ctx.ai.complete(prompt)` which is the correct call per the SDK contract.
 
 ---
 
@@ -117,14 +117,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [2.10.0] — 2026-05-18
 
 ### Added
-- **`list_tables(search, database?, connection_id?)`** — lightweight table search using T1 backend endpoint. Returns only table names/sizes, never truncated by chain executor. Solves the "only 8 tables visible" problem: `list_tables(search="tbl")` returns all a table/a table/etc instantly.
-- **`get_table_detail(table, database?, connection_id?)`** — columns + indexes for ONE specific table using T2 backend endpoint. Use after list_tables() to get exact column names before run_query().
+- **`list_tables(search, database?, connection_id?)`** — lightweight table search using the backend's table-search endpoint. Returns only table names/sizes, never truncated. Solves the "only 8 tables visible" problem: `list_tables(search="tbl")` returns all matching tables instantly.
+- **`get_table_detail(table, database?, connection_id?)`** — columns + indexes for ONE specific table using a focused backend endpoint. Use after list_tables() to get exact column names before run_query().
 
 ### Changed
 - **`get_schema` description** — redirects to `list_tables + get_table_detail` pattern for large databases. get_schema() still works for full schema overview.
 - **`system_prompt.txt`** — TABLE DISCOVERY rewritten as 3-step mandatory pattern: `list_tables → get_table_detail → run_query`.
 
-Root cause of "8 tables only": `get_schema()` returns 277 tables × all columns = large JSON → BUG-G (chain_prior_step_max_chars truncation). T1/T2 tiered approach returns small focused responses that never hit the truncation limit.
+Root cause of "8 tables only": `get_schema()` on a large database returns hundreds of tables × all columns = a large JSON payload that gets truncated before it reaches the AI. The tiered approach returns small focused responses that never hit the truncation limit.
 
 ---
 
@@ -135,7 +135,7 @@ Root cause of "8 tables only": `get_schema()` returns 277 tables × all columns 
 - **`run_query` description** — added "PREREQUISITE: you must know exact table/column names. If not — call get_schema() first. NEVER guess."
 - **`nl_to_sql` description** — clarified that it auto-fetches schema and generates SQL, then `run_query` should follow.
 
-Root cause: `system_prompt.txt` rules reach the LLM narrator, not the classifier. Classifier routing is controlled entirely by `@chat.function(description=...)` fields.
+Root cause: `system_prompt.txt` rules guide how the AI phrases responses, but routing to the right function is controlled entirely by `@chat.function(description=...)` fields.
 
 ---
 
@@ -154,7 +154,7 @@ Root cause: `system_prompt.txt` rules reach the LLM narrator, not the classifier
 - **`count_table(table, database?, connection_id?)`** — exact row count via `SELECT COUNT(*)`. Uses the T3 backend endpoint `/v1/connections/{id}/tables/{table}/count`. Use this instead of `get_schema()` when the user asks how many rows are in a table — `get_schema()` returns INFORMATION_SCHEMA estimates which can be 0 or significantly off for InnoDB tables.
 
 ### Fixed
-- **`on_event` format** — `panels.py` and `panels_editor.py` now use correct `sql-db.` app-id prefix (`sql-db.connection.added`, `sql-db.table.touched`, `sql-db.row.inserted` etc.). Per SDK docs: kernel prepends `app_id` when emitting — panel subscription must match the full event name.
+- **`on_event` format** — `panels.py` and `panels_editor.py` now use correct `sql-db.` app-id prefix (`sql-db.connection.added`, `sql-db.table.touched`, `sql-db.row.inserted` etc.). Per SDK docs: the platform prepends `app_id` when emitting — panel subscription must match the full event name.
 - **`select_connection` authorization** — added ownership check: `target.get("user_id") != uid` returns "Connection not found" instead of activating another user's connection.
 - **`system_prompt.txt`** — added `ROW COUNT ACCURACY` section: clarifies that `get_schema()` rows are INFORMATION_SCHEMA estimates (can be 0 or wrong), `run_query()` `total_rows` = fetched rows count after LIMIT, and `count_table()` is the only guaranteed-accurate source. Added routing rule 4a for "how many rows" queries.
 
@@ -165,8 +165,8 @@ Root cause: `system_prompt.txt` rules reach the LLM narrator, not the classifier
 ### Changed
 
 - **SDK 5.0.1** — bumped `imperal-sdk` to `5.0.1` (typed return contract, additive).
-- **`data_model=` migration** — all 22 `@chat.function` handlers now declare typed return DTOs via `data_model=`. New `models_return.py` with 19 Pydantic classes covering connections, execute, history, NLQ, query, and row operations. Enables `$REF` path validation and classifier envelope `return_fields`.
-- **V18 fix** — removed `from __future__ import annotations` from `app.py` (was co-located with 11 Pydantic `BaseModel` subclasses).
+- **`data_model=` migration** — all 22 `@chat.function` handlers now declare typed return DTOs via `data_model=`. New `models_return.py` with 19 Pydantic classes covering connections, execute, history, NLQ, query, and row operations. Enables cross-step reference path validation between chained functions.
+- **Fix** — removed `from __future__ import annotations` from `app.py` (was co-located with 11 Pydantic `BaseModel` subclasses).
 
 ---
 
@@ -174,7 +174,7 @@ Root cause: `system_prompt.txt` rules reach the LLM narrator, not the classifier
 
 ### Changed
 
-- **SDK 5.0.0 migration** — bumped `imperal-sdk` to `5.0.0`. Removed deprecated `system_prompt=` kwarg and `SYSTEM_PROMPT` variable (no-op in 5.0.0). Manifest rebuilt — `tool_sql_db_chat` orchestrator-tool entry removed (V25 compliance, `the platform invariant`).
+- **SDK 5.0.0 migration** — bumped `imperal-sdk` to `5.0.0`. Removed deprecated `system_prompt=` kwarg and `SYSTEM_PROMPT` variable (no-op in 5.0.0). Manifest rebuilt — the legacy orchestrator-tool entry was removed; the platform now dispatches each chat function directly.
 
 ---
 
@@ -199,7 +199,7 @@ Root cause: `system_prompt.txt` rules reach the LLM narrator, not the classifier
 
 ### Changed
 
-- SDK bumped `4.2.0 → 4.2.1` — fixes a validator check false positive on `@ext.tool("skeleton_alert_*")`.
+- SDK bumped `4.2.0 → 4.2.1` — fixes a manifest-validator false positive on `@ext.tool("skeleton_alert_*")`.
 
 ---
 
@@ -211,7 +211,7 @@ Root cause: `system_prompt.txt` rules reach the LLM narrator, not the classifier
 
 ### Fixed
 
-- **[the platform invariant] All 21 raw exception leaks eliminated** across all handler files. Raw `str(e)` and `f"Invalid JSON: {e}"` were reaching users in violation of the platform invariant/2. All sites now `log.error(...)` internally and return a stable safe message.
+- **All 21 raw exception leaks eliminated** across all handler files. Raw `str(e)` and `f"Invalid JSON: {e}"` were reaching users. All sites now `log.error(...)` internally and return a stable safe message.
   - `handlers_connections.py` — 6 sites (add/list/resolve/test/select/delete connection)
   - `handlers_query.py` — 4 sites (run_query, get_schema, explain_query, dry_run)
   - `handlers_execute.py` — 2 sites (execute_sql, run_editor_sql)
@@ -219,9 +219,9 @@ Root cause: `system_prompt.txt` rules reach the LLM narrator, not the classifier
   - `handlers_history.py` — 5 sites (list_history, save/list/run/delete saved)
   - `handlers_nlq.py` — 1 site (nl_to_sql)
 - **[Skeleton] `"error": str(e)` removed from degraded return in `skeleton.py`** — zero-value dict only on backend failure.
-- **[V18] `from __future__ import annotations` removed** from all 6 handler files that define Pydantic `BaseModel` param classes.
+- **`from __future__ import annotations` removed** from all 6 handler files that define Pydantic `BaseModel` param classes.
 - **[Logging] `import logging` + `log` added** to `handlers_connections.py`, `handlers_history.py`, `handlers_nlq.py`.
-- **[Backend] `the backend/routes_query.py` — 4 raw exception leaks fixed** — `/query`, `/execute`, `/explain`, `/dry_run` no longer return `f"...{e}"` in HTTP 500 detail. Error logged via `log.error(...)` (operator-visible in journald/SigNoz); `_log_query` still records full error text in `query_history` for audit. Service restarted.
+- **[Backend] query routes — 4 raw exception leaks fixed** — `/query`, `/execute`, `/explain`, `/dry_run` no longer return `f"...{e}"` in HTTP 500 detail. Error logged internally for operators; query history still records full error text for audit.
 
 ---
 
@@ -229,7 +229,7 @@ Root cause: `system_prompt.txt` rules reach the LLM narrator, not the classifier
 
 ### Fixed
 
-- **[P0] Schema cap 50 tables removed** — `skeleton.py` and `fn_get_schema` previously truncated the schema mirror to the first 50 tables. Databases with >50 tables (a customer database, large production DBs) got spurious "Unknown table" errors on tables 51+. Cap removed; all tables now cached.
+- **[P0] Schema cap 50 tables removed** — `skeleton.py` and `fn_get_schema` previously truncated the schema mirror to the first 50 tables. Databases with >50 tables (large production databases) got spurious "Unknown table" errors on tables 51+. Cap removed; all tables now cached.
 - **[P0] Schema cache invalidated on connection switch** — `fn_select_connection` now calls `invalidate_schema_cache(ctx)` after switching. Previously, switching from connection A to B kept A's schema in `"schema:active"` for up to 5 minutes, causing write-time validators to reject valid tables/columns on the new connection.
 - **[P1] `events.py` `patch_cache_on_dml` — `cache.get` argument order fixed** — args were reversed (`cache.get(ModelClass, key)` instead of `cache.get(key, model=ModelClass)`). Every call raised an exception that was silently caught, making `patch_cache_on_dml` a no-op since v2.0.0. Optimistic row-count delta and `"just now"` sidebar badge now work correctly.
 - **[P1] `fn_run_editor_sql` — zero-row DML fail added** — `UPDATE`/`DELETE`/`INSERT`/`REPLACE` that affects 0 rows now returns `ActionResult.error(...)` from the editor panel, consistent with `fn_execute_sql` (chat path). Previously the panel showed `"UPDATE — 0 row(s) affected"` as success.
@@ -274,9 +274,8 @@ Root cause: `system_prompt.txt` rules reach the LLM narrator, not the classifier
 ### Changed
 
 - **`requirements.txt`** — `imperal-sdk==3.4.1` → `imperal-sdk==3.5.0`. SDK 3.5.0
-  routes `ExtensionsClient.emit()` through `the platform runtime.audit.record_action`
-  producing an `action_ledger` row per emit for federal observability. Emit signature
-  is unchanged; no extension code changes required.
+  routes extension event emits through the platform's audit layer, producing an
+  audit record per emit. Emit signature is unchanged; no extension code changes required.
 
 ### Fixed (P0 — nl_to_sql broken since 1.5.5)
 
@@ -373,21 +372,19 @@ point the user used.
 
 ---
 
-## [1.5.3] — 2026-04-30 — kernel `@ext.on_event` ctx=None workaround
+## [1.5.3] — 2026-04-30 — `@ext.on_event` ctx=None workaround
 
 ### Fixed (P0 — sidebar stuck on "Indexing schema…" forever)
 
 The 1.5.x design relied on three `@ext.on_event` handlers
 (`schema.refresh.requested`, `sql.ddl_executed`, `table.touched`) to do
-the cache-mutation work. The Imperal kernel's
-`the platform runtime.services.rule_engine.evaluate_event` dispatches them
-with literally `await handler_func(None, event_obj)` — i.e. the SDK
-contract leaks no per-user `ctx` into event handlers on the live
-platform. Every `ctx.cache.set` / `ctx.cache.delete` inside an event
-handler raises `AttributeError: 'NoneType' object has no attribute
-'cache'`, the kernel swallows + logs, and the cache never gets
-populated. So the panel's cold-cache placeholder ("Indexing schema…")
-stayed forever — small DBs, large DBs, every user.
+the cache-mutation work. On the live platform these handlers were
+dispatched without a per-user `ctx`, so every `ctx.cache.set` /
+`ctx.cache.delete` inside an event handler raised
+`AttributeError: 'NoneType' object has no attribute 'cache'`, the error
+was swallowed and logged, and the cache never got populated. So the
+panel's cold-cache placeholder ("Indexing schema…") stayed forever —
+small DBs, large DBs, every user.
 
 ### Changed
 
@@ -395,19 +392,19 @@ stayed forever — small DBs, large DBs, every user.
   `_render_schema_block` (now: `_populate_inline`). On a cache miss the
   panel calls `_api_catalog` + `_api_tables_page` directly, writes both
   envelopes to `ctx.cache`, and renders with data on the same paint.
-  Bounded by the backend's 5 s `statement timeout` per session, so worst
+  Bounded by the backend's 5 s per-statement timeout per session, so worst
   case the panel paints with a real "Schema unavailable" error in
   ~5–8 s rather than spinning forever. Warm-cache renders stay
   cache-only sub-millisecond.
 - **`events.py`** — `@ext.on_event` decorators removed; the file now
   exports plain async helpers (`patch_cache_on_dml`,
   `invalidate_cache_on_ddl`). The module docstring documents the
-  kernel-contract gap as the reason.
+  platform event-dispatch gap as the reason.
 - **`handlers_execute.py`** — `fn_run_editor_sql` calls those helpers
   inline after a successful execute (live ctx is available there). The
   `ctx.events.emit("...")` calls remain — the panel's
-  `refresh="on_event:..."` attribute hooks Redis pub/sub via the
-  kernel's panel re-render dispatch, which works regardless of whether
+  `refresh="on_event:..."` attribute triggers a panel re-render via the
+  platform's event dispatch, which works regardless of whether
   `@ext.on_event` Python handlers ran.
 
 ### Architectural note
@@ -415,9 +412,9 @@ stayed forever — small DBs, large DBs, every user.
 The Phase 2 spec's optimistic-UI + DDL-invalidation contract is
 preserved: same cache shapes, same emit names, same panel refresh
 semantics. Only the implementation moved from `@ext.on_event` (broken
-on this kernel) to inline call-site work. When the kernel grows a
-ctx-aware on_event dispatch (`handler_func(ctx, event_obj)`), the
-helpers in `events.py` can move back behind decorators with no
+on the current platform) to inline call-site work. When the platform
+grows a ctx-aware on_event dispatch (`handler_func(ctx, event_obj)`),
+the helpers in `events.py` can move back behind decorators with no
 call-site change.
 
 ---
@@ -474,26 +471,24 @@ intended state. All py_compile + symbol-presence checks now pass.
 
 Sidebar render time is now O(1) in target-DB size. The previous render path
 synchronously fetched the full schema from the backend inside the panel
-decorator on every event — a 10–30 s freeze on a a customer database-snapshot (hundreds
+decorator on every event — a 10–30 s freeze on a large database (hundreds
 of tables, multi-million-row activity logs). Phase 2 moves all schema data
 behind a typed cache, splits the event taxonomy DDL-vs-DML, and introduces
 optimistic-UI patching so a successful editor `INSERT`/`UPDATE`/`DELETE`
 updates the sidebar without any HTTP round-trip.
 
-Backend prerequisite (already deployed): the backend v1.3.0 with the four
-new schema tiers (T0 catalog / T1 tables-page / T2 table-detail / T3
-exact-count). Legacy `/v1/connections/{id}/schema` remains mounted as a
-compat shim and no longer runs a `SELECT COUNT(*)` per table — it now
-composes T0+T1 internally and returns row estimates from
+Backend prerequisite (already deployed): a new backend version with four
+schema tiers (catalog / tables-page / table-detail / exact-count). The
+legacy `/v1/connections/{id}/schema` endpoint remains mounted as a compat
+shim and no longer runs a `SELECT COUNT(*)` per table — it now composes
+catalog+tables-page internally and returns row estimates from
 `information_schema.TABLES.TABLE_ROWS`.
-
-Architecture spec: `Dimasickky-Extensions/extensions/sql-db-scale.md`.
 
 ### Added
 
 - **`events.py`** — three `@ext.on_event` handlers driving sidebar
   liveness. `schema.refresh.requested` populates `CatalogCache` +
-  `TablesPageCache` via T0+T1 off the panel render path, then emits
+  `TablesPageCache` via the catalog + tables-page endpoints off the panel render path, then emits
   `schema.indexed` to re-render. `sql.ddl_executed` invalidates catalog +
   first-page caches and re-fires `schema.refresh.requested`.
   `table.touched` performs an **optimistic local patch** on the cached
@@ -506,7 +501,7 @@ Architecture spec: `Dimasickky-Extensions/extensions/sql-db-scale.md`.
   indexes + FKs for one table). Cache-key builders (`cache_key_catalog`,
   `cache_key_tables_page`, `cache_key_table_detail`) live in `app.py` as
   the single source of truth — both `panels.py` and `events.py` use them.
-- **`app.py`** — four HTTP helpers wrapping the backend v1.3.0 tiered
+- **`app.py`** — four HTTP helpers wrapping the backend's tiered
   routes: `_api_catalog`, `_api_tables_page`, `_api_table_detail`,
   `_api_exact_count`.
 - **`sql_parser.py`** — `classify_event_kind(sql)` returns
@@ -543,7 +538,7 @@ Architecture spec: `Dimasickky-Extensions/extensions/sql-db-scale.md`.
 
 - The synchronous `_api_post("/v1/connections/{id}/schema", …)` call from
   the body of `@ext.panel("sidebar")`. This is the architectural
-  invariant of the sql-db-scale spec: the panel render path NEVER awaits
+  invariant of the scale work: the panel render path NEVER awaits
   an HTTP call to the backend. (The legacy endpoint itself stays mounted
   for backwards-compat with any extension still on 1.4.x; this codebase
   no longer reaches for it.)
@@ -552,7 +547,7 @@ Architecture spec: `Dimasickky-Extensions/extensions/sql-db-scale.md`.
 
 - SDK pin unchanged (`imperal-sdk==3.4.1`). All used primitives
   (`ctx.cache`, `@ext.cache_model`, `ctx.events.emit`, `@ext.on_event`,
-  `ui.List(page_size=, search=True)`) exist in 3.4.1; no kernel ask.
+  `ui.List(page_size=, search=True)`) exist in 3.4.1; no platform change required.
 - Wire-contract change vs the backend is **additive**: the four new
   endpoints sit at `/v1/connections/{id}/{catalog,tables,tables/{n}/detail,tables/{n}/count}`.
   Legacy `/v1/connections/{id}/schema` continues to serve and is still
@@ -589,13 +584,13 @@ Architecture audit pass: P0/P1 findings on top of the 1.4.1 LLM-input hardening.
 ### Fixed (P2)
 
 - **`app.py`** — bare `except: pass` in `resolve_connection` replaced with `log.warning(..., exc)` on both the active-flag query and the fallback query, per Dimasickky enterprise quality bar.
-- **`app.py`** — `ChatExtension(model="claude-haiku-4-5-20251001")` removed (deprecated since SDK 3.3.0). LLM model resolution is now kernel ctx-injection (`ctx._llm_configs`); the param will hard-error in SDK 4.0.
+- **`app.py`** — `ChatExtension(model="claude-haiku-4-5-20251001")` removed (deprecated since SDK 3.3.0). LLM model resolution is now handled by the platform via ctx injection; the param will hard-error in SDK 4.0.
 - **`main.py`** — stale module docstring `"sql-db v1.2.1 · …"` replaced with `"sql-db · entrypoint."` so version is sourced from one place (`Extension(version=…)`).
 
 ### Compatibility
 
 - SDK pin unchanged (`imperal-sdk==3.0.0`). 3.4.0 panel-slot validator (`slot="main"` → ValueError) does not affect this extension — both panels (`panels.py` sidebar `slot="left"`, `panels_editor.py` editor `slot="center"`) use explicit slot values that match the new whitelist.
-- Wire contract with `the backend:8099` unchanged.
+- Wire contract with the backend unchanged.
 
 ---
 
@@ -619,7 +614,7 @@ LLM tool-input robustness: every `@chat.function` params model now accepts the s
 
 ### Architecture note
 
-`AliasChoices` is applied **only** to LLM-input models (those bound to `@chat.function` params). Internal models (`PulseParams`), wire contracts to `the backend:8099`, and storage payloads remain strict — the LLM-tolerance is contained at the chat boundary.
+`AliasChoices` is applied **only** to LLM-input models (those bound to `@chat.function` params). Internal models (`PulseParams`), the backend wire contract, and storage payloads remain strict — the LLM-tolerance is contained at the chat boundary.
 
 ### Not changed
 
@@ -652,7 +647,7 @@ Pin bump only: `imperal-sdk==1.6.2` → `imperal-sdk==2.0.1`. No source changes.
 
 ### Why
 
-`imperal-sdk` 2.0.1 supersedes the rolled-back 2.0.0 with the v1.6.2 contract restored plus two kernel-internal ICNLI Action Authority hotfixes (`chat/guards.py` destructive `BLOCK` → `ESCALATE`, `core/intent.action_plan.args` JSON-encoded string for OpenAI strict mode). The SDK API surface remains identical to 1.6.2. Per the team's release note: *"v1.6.2 extensions upgrade by pin bump only."*
+`imperal-sdk` 2.0.1 supersedes the rolled-back 2.0.0 with the v1.6.2 contract restored plus two internal platform hotfixes. The SDK API surface remains identical to 1.6.2 — v1.6.2 extensions upgrade by pin bump only.
 
 ### Changed
 
@@ -666,7 +661,7 @@ Pin bump only: `imperal-sdk==1.6.2` → `imperal-sdk==2.0.1`. No source changes.
 
 ## [1.3.4] — 2026-04-26
 
-Hotfix on top of 1.3.3 — schema cache mirror was silently failing in production with `the platform invariant`, leaving the column-level validator permanently cold.
+Hotfix on top of 1.3.3 — schema cache mirror was silently failing in production because the cache model was not registered, leaving the column-level validator permanently cold.
 
 ### Fixed
 
@@ -706,7 +701,7 @@ The same skeleton snapshot is now visible from both surfaces — read-only LLM e
 
 ### Why this matters
 
-In production logs from 2026-04-25, `gpt-4.1-mini` running inside `tool_sql_db_chat` issued `INSERT INTO products (name, category, price, stock) VALUES (...)` — but the real schema is `(id, name, category_id, price, stock)`. MariaDB returned `1054 Unknown column 'category'`, the LLM did not engage the SCHEMA-FIRST recovery pattern from the system prompt, and a second hallucinated INSERT into a freshly-created `employees` table with a phantom `department` column failed the same way.
+In production logs from 2026-04-25, the AI issued `INSERT INTO products (name, category, price, stock) VALUES (...)` — but the real schema is `(id, name, category_id, price, stock)`. MariaDB returned `1054 Unknown column 'category'`, the LLM did not engage the SCHEMA-FIRST recovery pattern from the system prompt, and a second hallucinated INSERT into a freshly-created `employees` table with a phantom `department` column failed the same way.
 
 Three structural causes:
 
@@ -720,7 +715,7 @@ This release closes all three: the cache channel works under 1.6.x's permission 
 
 ## [1.3.2] — 2026-04-25
 
-Pin `imperal-sdk==1.6.2` after rolling back the v2.0.0 / SDK v2.0 / the platform rebuild. Code unchanged from 1.3.1; only the SDK constraint moves from `>=1.5.26,<1.6` to the exact runtime version in production. The v2.0 work is preserved on the `sdk-v2-migration` branch (and tagged `pre-1.6.2-rebuild-2026-04-25` on main pre-reset) for incremental re-roll.
+Pin `imperal-sdk==1.6.2` after rolling back the v2.0.0 / SDK v2.0 rebuild. Code unchanged from 1.3.1; only the SDK constraint moves from `>=1.5.26,<1.6` to the exact runtime version in production. The v2.0 work is preserved on the `sdk-v2-migration` branch (and tagged `pre-1.6.2-rebuild-2026-04-25` on main pre-reset) for incremental re-roll.
 
 ### Changed
 
@@ -730,7 +725,7 @@ Pin `imperal-sdk==1.6.2` after rolling back the v2.0.0 / SDK v2.0 / the platform
 
 ## [1.3.1] — 2026-04-23
 
-Symmetry patch bringing sql-db onto the same fail-fast ctx contract as notes 2.4.1. No behaviour changes except: a chain step arriving without `ctx.user` populated now produces a loud `ActionResult.error("No authenticated user…")` instead of silently scoping every `ctx.store` / the backend query to `user_id=""` and returning empty collections (indistinguishable from a real empty list).
+Symmetry patch bringing sql-db onto the same fail-fast ctx contract as notes 2.4.1. No behaviour changes except: a chain step arriving without `ctx.user` populated now produces a loud `ActionResult.error("No authenticated user…")` instead of silently scoping every `ctx.store` / backend query to `user_id=""` and returning empty collections (indistinguishable from a real empty list).
 
 ### Added
 
@@ -745,7 +740,7 @@ Symmetry patch bringing sql-db onto the same fail-fast ctx contract as notes 2.4
 
 ## [1.3.0] — 2026-04-23
 
-Fundamental hygiene pass after deep audit against SDK 1.5.26. No behaviour changes for the LLM, but the extension now obeys all platform conventions and removes two workarounds for kernel bugs that have since been fixed upstream.
+Fundamental hygiene pass after deep audit against SDK 1.5.26. No behaviour changes for the LLM, but the extension now obeys all platform conventions and removes two workarounds for platform bugs that have since been fixed upstream.
 
 ### Added
 
@@ -767,7 +762,7 @@ Fundamental hygiene pass after deep audit against SDK 1.5.26. No behaviour chang
 
 ### Removed
 
-- **`_direct_params(ctx)` fallback** in `handlers_execute.py` — the kernel an internal session automation-path fix (the platform invariant, SDK 1.5.21+) is rolled out and Pydantic params now bind normally. The workaround is dead code.
+- **`_direct_params(ctx)` fallback** in `handlers_execute.py` — the platform's automation-path fix (SDK 1.5.21+) is rolled out and Pydantic params now bind normally. The workaround is dead code.
 
 ### Known limitations / deferred
 
@@ -779,9 +774,9 @@ Fundamental hygiene pass after deep audit against SDK 1.5.26. No behaviour chang
 Two bugs the user kept hitting in chat — LLM hallucinating column names (`status`, `payment_method` not in table) and `{name}` literal leaking into error messages — were half us, half platform. This release closes the extension half:
 
 - Column hallucination: one-turn structured correction instead of opaque MySQL 1054.
-- Scope/manifest drift: nothing in `imperal.json` can now confuse the the platform's tool resolver.
+- Scope/manifest drift: nothing in `imperal.json` can now confuse the platform's tool resolver.
 
-The `{name}` / function-not-found side is 100% kernel (un-interpolated f-string in the tool dispatcher) — reported to the platform team separately.
+The `{name}` / function-not-found side is 100% platform-side (un-interpolated f-string in the tool dispatcher) — reported to the platform team separately.
 
 ---
 
@@ -791,13 +786,13 @@ Sidebar row counts refresh after panel-direct DML.
 
 ### Added
 
-- `_pulse_sql_executed` internal chat function (`event="sql.executed"`, `action_type="write"`) — does nothing, exists only so the kernel publishes the event.
+- `_pulse_sql_executed` internal chat function (`event="sql.executed"`, `action_type="write"`) — does nothing, exists only so the platform publishes the event.
 - `run_and_show` (SQL Editor Execute) calls it via `ctx.extensions.call("sql-db", "_pulse_sql_executed", ...)` after successful DML.
 - `process_row_form_submit` (Row Form insert/update) does the same.
 
 ### Why
 
-Both the editor Form and the row_form submit go to their panel handlers which call `/v1/connections/{id}/execute` and `/row` directly via httpx — bypassing `@chat.function`. Kernel auto-event-publishing only fires when a `@chat.function` with `event=` returns `ActionResult.success`. Without this pulse, `sql.executed` / `row.*` never fire for panel-driven DML → sidebar's `refresh="on_event:..."` subscription never triggers → the schema row count stays stale.
+Both the editor Form and the row_form submit go to their panel handlers which call `/v1/connections/{id}/execute` and `/row` directly via httpx — bypassing `@chat.function`. Auto-event-publishing only fires when a `@chat.function` with `event=` returns `ActionResult.success`. Without this pulse, `sql.executed` / `row.*` never fire for panel-driven DML → sidebar's `refresh="on_event:..."` subscription never triggers → the schema row count stays stale.
 
 ### Known remaining limitation
 
@@ -872,7 +867,7 @@ Row-level CRUD in the panel UI. No more raw-SQL-only for simple edits.
 - `delete_row` (action_type=destructive, event=`row.deleted`) — parameterized DELETE with `LIMIT 1`
 - Values travel as JSON strings (`values_json`) and are parsed server-side; no SQL-string assembly anywhere
 
-#### Backend endpoint (the backend v1.1.0)
+#### Backend endpoint
 
 - `POST /v1/connections/{conn_id}/row` — single endpoint for all three row operations
 - Identifiers (table + column names) validated against `^[A-Za-z_][A-Za-z0-9_]*$` and backtick-escaped
@@ -912,7 +907,7 @@ Initial release — production-ready end-to-end SQL workbench.
 
 #### Core
 
-- `ChatExtension` pattern — single `tool_sql_db_chat` entry point with LLM internal routing
+- `ChatExtension` pattern — AI routes user intent to the correct function automatically
 - 17 chat functions across 5 domains: connections, schema/query, execute, history, NLQ
 - Fernet password encryption — plaintext passwords never touch the Store
 - Backend HTTP client with error-detail preservation (no `raise_for_status()`)
@@ -923,7 +918,7 @@ Initial release — production-ready end-to-end SQL workbench.
 
 - `add_connection` — test-then-save flow with Fernet encryption
 - `list_connections`, `test_connection`, `select_connection`, `delete_connection`
-- Stored in the gateway `ctx.store` collection `db_connections`
+- Stored in the platform's `ctx.store` collection `db_connections`
 - Active-connection fallback in `resolve_connection()`
 
 #### Queries (`handlers_query.py`, `handlers_execute.py`)
@@ -965,7 +960,7 @@ Initial release — production-ready end-to-end SQL workbench.
 - `ui.Alert` uses `title=`, `message=`, `type=` (not `variant=`)
 - Backend validator needs first-word fallback for sqlglot "Command" statements (ALTER DATABASE, SET GLOBAL, …)
 - `raise_for_status()` destroys HTTP error detail — extract `.detail` manually on 4xx/5xx
-- After writing extension files, `touch main.py` to trigger kernel mtime hot-reload
+- After writing extension files, `touch main.py` to trigger the platform's mtime hot-reload
 
 ### Stress-tested (2026-04-15)
 

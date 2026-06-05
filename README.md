@@ -24,7 +24,7 @@
 It connects to any MySQL / MariaDB database and lets users read, query, and modify data through natural language or raw SQL. Passwords are encrypted with Fernet; queries are validated, classified, and optionally rolled back. Results render inline in a self-contained editor panel — no round-trip through chat required.
 
 ```
-User: "подключись к базе production"
+User: "подключись к базе"
   → SQL DB prompts for host/user/password, tests, saves.
 
 User: "какие у меня таблицы?"
@@ -62,7 +62,7 @@ User types SQL in editor panel, hits Run
 
 ## Functions
 
-All functions are exposed through a single `ChatExtension` entry point (`tool_sql_db_chat`). The AI routes user intent to the correct function automatically.
+The AI routes user intent to the correct function automatically.
 
 ### Connections
 
@@ -101,7 +101,7 @@ All functions are exposed through a single `ChatExtension` entry point (`tool_sq
 ## Architecture
 
 ```
-Imperal Panel (panel.imperal.io)
+Imperal Panel
         │
         ├── Sidebar Panel (left)          ← @ext.panel("sidebar")
         │   connections + schema tree       panels.py
@@ -111,24 +111,20 @@ Imperal Panel (panel.imperal.io)
             + TextArea → inline results
             + History / Saved tabs
 
-Hub (imperal-hub namespace)
+Extension chat functions
         │
-        └── execute_sdk_tool
-                │
-                └── tool_sql_db_chat  ← ChatExtension entry point
-                        │
-                        ├── handlers_connections.py (connection CRUD)
-                        ├── handlers_query.py       (query/explain/dry_run/schema)
-                        ├── handlers_execute.py     (DML/DDL + universal editor)
-                        ├── handlers_nlq.py         (NL → SQL via ctx.ai)
-                        ├── handlers_history.py     (history + saved)
-                        └── skeleton.py             (background schema cache)
+        ├── handlers_connections.py (connection CRUD)
+        ├── handlers_query.py       (query/explain/dry_run/schema)
+        ├── handlers_execute.py     (DML/DDL + universal editor)
+        ├── handlers_nlq.py         (NL → SQL via ctx.ai)
+        ├── handlers_history.py     (history + saved)
+        └── skeleton.py             (background schema cache)
 
-the backend API (separate repo, FastAPI :8099)
+Backend API (separate service)
         │
         ├── Fernet decrypt password
-        ├── sqlglot validator  (classify read/write, auto-LIMIT)
-        └── aiomysql → user MySQL / MariaDB
+        ├── SQL validator  (classify read/write, auto-LIMIT)
+        └── connects to your MySQL / MariaDB
 ```
 
 ### File Structure
@@ -168,12 +164,12 @@ The extension publishes the following events for use in Automation Rules:
 
 ## Environment
 
-The extension reads these env vars on the Imperal Platform Worker:
+The extension reads these env vars on the platform:
 
 | Variable | Purpose |
 |----------|---------|
-| `DB_SERVICE_URL` | URL of the `the backend` backend (e.g. `https://the backend.internal.example.com`) — required |
-| `DB_SERVICE_KEY` | API key for `the backend` |
+| `DB_SERVICE_URL` | URL of the backend API (e.g. `https://the backend.internal.example.com`) — required |
+| `DB_SERVICE_KEY` | API key for the backend |
 | `SQL_DB_ENCRYPTION_KEY` | Fernet key — MUST match the backend key (shared secret) |
 
 ---
@@ -192,7 +188,6 @@ imperal dev
 
 ### SDK Compliance
 
-- Single `ChatExtension` entry point (`tool_sql_db_chat`)
 - All `@chat.function` handlers return `ActionResult`
 - Pydantic `BaseModel` params with `Field(description=...)`
 - All write/destructive functions declare `event=`
