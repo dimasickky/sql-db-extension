@@ -379,7 +379,7 @@ class GetTableDetailParams(BaseModel):
     description=(
         "Search for tables by name. Use this FIRST when user mentions a table by name "
         "or asks to find a table — returns just table names, very fast, never truncated. "
-        "Examples: search='tbl' finds all a table/a table/etc, search='invoice' finds invoice-related tables. "
+        "Examples: search='tbl' finds all tables starting with 'tbl', search='invoice' finds invoice-related tables. "
         "Then call get_table_detail() for column structure of the specific table you found."
     ),
 )
