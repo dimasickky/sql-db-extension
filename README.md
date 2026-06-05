@@ -168,7 +168,7 @@ The extension reads these env vars on the platform:
 
 | Variable | Purpose |
 |----------|---------|
-| `DB_SERVICE_URL` | URL of the backend API (e.g. `https://the backend.internal.example.com`) — required |
+| `DB_SERVICE_URL` | URL of the backend API (e.g. `https://your-backend.example.com`) — required |
 | `DB_SERVICE_KEY` | API key for the backend |
 | `SQL_DB_ENCRYPTION_KEY` | Fernet key — MUST match the backend key (shared secret) |
 
