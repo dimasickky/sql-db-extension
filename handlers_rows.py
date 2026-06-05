@@ -48,11 +48,11 @@ async def _bump_sidebar_for_dml(
 # ─── Event pulse (internal) ───────────────────────────────────────────── #
 
 class PulseParams(BaseModel):
-    """Side-channel to make the kernel publish `sql-db.sql.executed`.
+    """Side-channel to make the platform publish `sql-db.sql.executed`.
 
     Called via `ctx.extensions.call(...)` from panel handlers that ran DML
     through `/execute` or `/row` directly — those bypass @chat.function, so
-    the kernel has no way to emit the event automatically. This tiny
+    the platform has no way to emit the event automatically. This tiny
     write-typed function gives it a hook.
     """
     kind: str = Field(default="dml", description="Origin marker for debugging")

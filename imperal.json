@@ -48,7 +48,7 @@
         "properties": {
           "name": {
             "default": "",
-            "description": "Short connection label (e.g. 'a customer database', 'production'). Optional — derived from host+database when empty.",
+            "description": "Short connection label (e.g. 'analytics', 'staging'). Optional — derived from host+database when empty.",
             "title": "Name",
             "type": "string"
           },
@@ -210,7 +210,7 @@
       "effects": [],
       "id_projection": "",
       "params_schema": {
-        "description": "Empty params model for @chat.function handlers with no business inputs (validator).",
+        "description": "Empty params model for @chat.function handlers with no business inputs.",
         "properties": {},
         "title": "NoParams",
         "type": "object"
@@ -2334,7 +2334,7 @@
       ],
       "id_projection": "",
       "params_schema": {
-        "description": "Side-channel to make the kernel publish `sql-db.sql.executed`.\n\nCalled via `ctx.extensions.call(...)` from panel handlers that ran DML\nthrough `/execute` or `/row` directly — those bypass @chat.function, so\nthe kernel has no way to emit the event automatically. This tiny\nwrite-typed function gives it a hook.",
+        "description": "Side-channel to make the platform publish `sql-db.sql.executed`.\n\nCalled via `ctx.extensions.call(...)` from panel handlers that ran DML\nthrough `/execute` or `/row` directly — those bypass @chat.function, so\nthe platform has no way to emit the event automatically. This tiny\nwrite-typed function gives it a hook.",
         "properties": {
           "kind": {
             "default": "dml",

@@ -26,7 +26,7 @@ log = logging.getLogger("sql-db")
 async def _pulse_sql_executed(ctx) -> None:
     """Emit sql.executed so the sidebar schema re-fetches row counts.
 
-    Panel Execute bypasses @chat.function, so kernel auto-event-publishing
+    Panel Execute bypasses @chat.function, so platform auto-event-publishing
     doesn't fire. We nudge it via a tiny internal function that has
     event="sql.executed" on its decorator. Failures are swallowed — the
     event is a UX nicety, never load-bearing.

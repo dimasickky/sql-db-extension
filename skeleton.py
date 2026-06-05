@@ -93,7 +93,7 @@ async def skeleton_alert_db_schema(
     old: dict | None = None,
     new: dict | None = None,
 ) -> dict:
-    """Called by kernel when db_schema snapshot changes between ticks."""
+    """Called by platform when db_schema snapshot changes between ticks."""
     if not old or not new:
         return {"response": ""}
 

@@ -163,10 +163,10 @@ async def _render_schema_block(ctx, conn: dict, conn_id: str, database: str) -> 
     """Render the schema tree.
 
     Cache-first: read CatalogCache + first TablesPageCache. If either is
-    cold, populate INLINE in this same render — kernel's `@ext.on_event`
+    cold, populate INLINE in this same render — platform's `@ext.on_event`
     contract on this platform passes ``ctx=None`` to handlers, so we can't
     delegate cache writes to a background event handler. Inline populate
-    is bounded by the backend's statement timeout=5s on every introspection
+    is bounded by the backend's a statement timeout on every introspection
     session, so worst case the panel paints with placeholder + empty error
     state in ~5–8 s rather than spinning forever.
 

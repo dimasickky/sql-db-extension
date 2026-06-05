@@ -19,7 +19,7 @@ log = logging.getLogger("sql-db")
 # ─── Models ───────────────────────────────────────────────────────────────── #
 
 class NoParams(BaseModel):
-    """Empty params model for @chat.function handlers with no business inputs (validator)."""
+    """Empty params model for @chat.function handlers with no business inputs."""
     model_config = ConfigDict(populate_by_name=True)
 
 
@@ -31,7 +31,7 @@ class AddConnectionParams(BaseModel):
         default="",
         validation_alias=AliasChoices("name", "connection_name", "conn_name", "label"),
         description=(
-            "Short connection label (e.g. 'a customer database', 'production'). "
+            "Short connection label (e.g. 'analytics', 'staging'). "
             "Optional — derived from host+database when empty."
         ),
     )

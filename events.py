@@ -2,12 +2,12 @@
 
 NOTE on @ext.on_event vs inline call-site work:
 
-The Imperal kernel's `the platform runtime.services.rule_engine.evaluate_event`
+The platform's event dispatch
 dispatches `@ext.on_event` handlers with literally `await
 handler_func(None, event_obj)` — the SDK contract leaks no per-user ctx
 into event handlers on the live platform. Any attempt to do `ctx.cache.set`
 from inside an `@ext.on_event` handler crashes with `AttributeError:
-'NoneType' object has no attribute 'cache'` (kernel swallows + logs but the
+'NoneType' object has no attribute 'cache'` (platform swallows + logs but the
 side-effect never lands). This is fine for fan-out signal events, broken
 for cache mutations.
 
@@ -16,10 +16,10 @@ optimistic UI, cache invalidation on DDL) lives in this module as plain
 async helpers and is called inline from `fn_run_editor_sql` (which has
 the live ctx). The `ctx.events.emit("...")` calls there continue to fire
 — the panel `refresh="on_event:..."` attribute hooks Redis pub/sub
-directly via the kernel's panel re-render dispatch, regardless of
+directly via the platform's panel re-render dispatch, regardless of
 whether `@ext.on_event` Python handlers ran.
 
-Once the kernel grows a ctx-aware `on_event` dispatch (`handler_func(ctx,
+Once the platform grows a ctx-aware `on_event` dispatch (`handler_func(ctx,
 event_obj)`), these helpers can be moved back behind decorators with no
 call-site change.
 """

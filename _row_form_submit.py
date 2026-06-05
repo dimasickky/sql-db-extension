@@ -32,7 +32,7 @@ def _collect_values(form_params: dict, mode: str) -> dict:
 async def _pulse_sidebar(ctx, mode: str) -> None:
     """Emit sql.executed via internal ctx.extensions.call so sidebar refreshes.
 
-    Row-form DML bypasses @chat.function → kernel doesn't publish events.
+    Row-form DML bypasses @chat.function → platform doesn't publish events.
     Failure is swallowed — this is a UX nicety, never load-bearing.
     """
     try:

@@ -77,8 +77,8 @@ def _first_word(sql: str) -> str:
 async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
     """Execute a DML/DDL statement.
 
-    Automation `tool_call` steps flow through kernel's `the platform`
-    (an internal session fix, the platform invariant) and arrive bound to the Pydantic model
+    Automation `tool_call` steps flow through platform's `the direct-call path`
+    and arrive bound to the Pydantic model
     like any chat tool use — no `_direct_params` fallback needed.
     """
     try:
@@ -147,7 +147,7 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
         rows_affected = int(result.get("rows_affected", 0) or 0)
         query_type = (result.get("query_type") or "").upper()
 
-        # Loud fail for automation-path zero-row writes: the kernel normalizes
+        # Loud fail for automation-path zero-row writes: the platform normalizes
         # ActionResult.success into status=ok and reports steps=1 failed=0 even
         # when INSERT/UPDATE/DELETE affected no rows. Surface that as error so
         # rules don't report phantom success.
@@ -165,7 +165,7 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
             await invalidate_schema_cache(ctx)
 
         # Phase 2 sidebar liveness — same wiring as fn_run_editor_sql.
-        # Inline cache mutation (kernel @ext.on_event has ctx=None on this
+        # Inline cache mutation (platform @ext.on_event has ctx=None on this
         # platform) + emit() for panel re-render. Best-effort — never
         # mask a successful execute.
         try:
@@ -282,7 +282,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
 
         # Phase 2 sidebar liveness — classify the executed statement, then:
         #   - mutate ctx.cache HERE inline (we have the live ctx; the
-        #     kernel's @ext.on_event dispatch passes ctx=None so cache
+        #     platform's @ext.on_event dispatch passes ctx=None so cache
         #     writes from event handlers don't work on this platform),
         #   - fire the corresponding ctx.events.emit so the panel's
         #     refresh="on_event:..." re-renders. The Redis pub/sub →
