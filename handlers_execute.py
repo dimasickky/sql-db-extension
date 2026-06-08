@@ -19,7 +19,12 @@ from sql_parser import (
     extract_target_tables,
     extract_insert_columns,
     extract_update_columns,
+    classify_event_kind,
 )
+# Bind sidebar-liveness helpers at module load time. They were previously
+# imported lazily inside the handler; load-time binding avoids a module
+# re-import edge case so the optimistic sidebar update never silently skips.
+from events import patch_cache_on_dml, invalidate_cache_on_ddl
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -169,8 +174,6 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
         # platform) + emit() for panel re-render. Best-effort — never
         # mask a successful execute.
         try:
-            from sql_parser import classify_event_kind
-            from events import patch_cache_on_dml, invalidate_cache_on_ddl
             klass, subkind, target = classify_event_kind(sql)
             database = conn.get("database", "")
             if klass == "ddl":
@@ -290,8 +293,6 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
         #     handlers, so the panel still updates after this completes.
         # All best-effort: never mask a successful execute.
         try:
-            from sql_parser import classify_event_kind
-            from events import patch_cache_on_dml, invalidate_cache_on_ddl
             klass, subkind, target = classify_event_kind(sql)
             affected = int(result.get("rows_affected") or 0)
             database = conn.get("database", "")

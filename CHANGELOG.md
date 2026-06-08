@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.18.1] — 2026-06-08
+
+### Fixed
+
+- Sidebar table list now reliably refreshes its row-count and "just now" indicators right
+  after an insert / update / delete (previously the optimistic update could be silently
+  skipped, leaving stale counts until the next full reload). The SQL write itself was never
+  affected.
+
+---
+
 ## [2.18.0] — 2026-06-03
 
 ### Added

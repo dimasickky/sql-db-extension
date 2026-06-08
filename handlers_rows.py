@@ -18,6 +18,9 @@ from schema_guard import (
     validate_columns,
     validate_table_exists,
 )
+# Bind at module load time (was a lazy import inside the handler); avoids a
+# module re-import edge case so the optimistic sidebar update never silently skips.
+from events import patch_cache_on_dml
 
 log = logging.getLogger("sql-db")
 
@@ -31,7 +34,6 @@ async def _bump_sidebar_for_dml(
     here so insert_row/update_row/delete_row stay live too.
     """
     try:
-        from events import patch_cache_on_dml
         database = (conn or {}).get("database", "")
         await patch_cache_on_dml(
             ctx, conn_id=conn_id, database=database, table=table,
