@@ -108,7 +108,7 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
             tail = params.database or params.db_user or ""
             name = f"{host_short}_{tail}".rstrip("_") or host_short
 
-        pwd_enc = encrypt_password(params.password)
+        pwd_enc = await encrypt_password(ctx, params.password)
         conn_info = {
             "host": params.host, "port": params.port, "user": params.db_user,
             "password_encrypted": pwd_enc, "database": params.database,

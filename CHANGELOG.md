@@ -4,6 +4,16 @@ All notable changes to Imperal SQL DB are documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+## [2.19.0] — 2026-07-01
+
+### Changed
+
+- **Backend credentials are now managed as encrypted secrets.** The backend API key and the
+  password-encryption (Fernet) key are declared as app-scoped `@ext.secret` entries and read from
+  encrypted secret storage at runtime instead of plaintext environment variables — set them once in
+  the Developer Portal → Secrets tab. No value ever lives in the source. Rebuilt against the latest
+  platform SDK.
+
 ---
 
 ## [2.18.4] — 2026-06-25

@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.3.0",
+  "sdk_version": "5.9.2",
   "app_id": "sql-db",
-  "version": "2.18.4",
+  "version": "2.19.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -2594,5 +2594,43 @@
     "on_install": {
       "signature": "(ctx) -> None"
     }
-  }
+  },
+  "secrets": [
+    {
+      "name": "db_service_key",
+      "description": "API key the SQL backend service authenticates with. Shared across all users; set once in Developer Portal → Secrets.",
+      "required": true,
+      "write_mode": "user",
+      "max_bytes": 256,
+      "scope": "app"
+    },
+    {
+      "name": "sql_db_encryption_key",
+      "description": "Fernet key used to encrypt saved DB passwords before they reach the backend. Must match the backend's key. Shared across all users; set once in Developer Portal → Secrets.",
+      "required": true,
+      "write_mode": "user",
+      "max_bytes": 256,
+      "scope": "app"
+    }
+  ],
+  "panels": [
+    {
+      "panel_id": "secrets",
+      "slot": "right",
+      "title": "Secrets",
+      "tree": {}
+    },
+    {
+      "panel_id": "sidebar",
+      "slot": "left",
+      "title": "SQL DB",
+      "tree": {}
+    },
+    {
+      "panel_id": "editor",
+      "slot": "center",
+      "title": "SQL Editor",
+      "tree": {}
+    }
+  ]
 }

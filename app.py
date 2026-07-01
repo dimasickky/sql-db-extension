@@ -12,29 +12,19 @@ log = logging.getLogger("sql-db")
 # ─── Config ───────────────────────────────────────────────────────────────── #
 
 DB_SERVICE_URL = os.environ["DB_SERVICE_URL"]
-DB_SERVICE_KEY = os.getenv("DB_SERVICE_KEY", "")
-SQL_DB_ENCRYPTION_KEY = os.getenv("SQL_DB_ENCRYPTION_KEY", "")
 
 CONN_COLLECTION = "db_connections"
 
 
 # ─── Fernet (encrypt passwords before sending to backend) ─────────────────── #
 
-_fernet = None
-
-
-def _get_fernet():
-    global _fernet
-    if _fernet is None:
-        from cryptography.fernet import Fernet
-        if not SQL_DB_ENCRYPTION_KEY:
-            raise RuntimeError("SQL_DB_ENCRYPTION_KEY not set")
-        _fernet = Fernet(SQL_DB_ENCRYPTION_KEY.encode())
-    return _fernet
-
-
-def encrypt_password(plaintext: str) -> str:
-    return _get_fernet().encrypt(plaintext.encode()).decode()
+async def encrypt_password(ctx, plaintext: str) -> str:
+    # App-scope Fernet key from Vault (Developer Portal → Secrets). No value in code.
+    from cryptography.fernet import Fernet
+    key = (await ctx.secrets.get("sql_db_encryption_key")) or ""
+    if not key:
+        raise RuntimeError("sql_db_encryption_key not set")
+    return Fernet(key.encode()).encrypt(plaintext.encode()).decode()
 
 
 # ─── MySQL error translator ───────────────────────────────────────────────── #
@@ -100,8 +90,10 @@ def _db_url(path: str) -> str:
     return f"{DB_SERVICE_URL.rstrip('/')}{path}"
 
 
-def _auth() -> dict:
-    return {"x-api-key": DB_SERVICE_KEY} if DB_SERVICE_KEY else {}
+async def _auth(ctx) -> dict:
+    # App-scope secret from Vault (Developer Portal → Secrets). No value in code.
+    key = (await ctx.secrets.get("db_service_key")) or ""
+    return {"x-api-key": key} if key else {}
 
 
 def _extract_error(resp) -> dict:
@@ -126,28 +118,28 @@ def _safe_body(resp) -> dict:
 
 
 async def _api_post(ctx, path: str, data: dict) -> dict:
-    r = await ctx.http.post(_db_url(path), json=data, headers=_auth())
+    r = await ctx.http.post(_db_url(path), json=data, headers=await _auth(ctx))
     if not r.ok:
         return _extract_error(r)
     return _safe_body(r)
 
 
 async def _api_get(ctx, path: str, params: dict | None = None) -> dict:
-    r = await ctx.http.get(_db_url(path), params=params or {}, headers=_auth())
+    r = await ctx.http.get(_db_url(path), params=params or {}, headers=await _auth(ctx))
     if not r.ok:
         return _extract_error(r)
     return _safe_body(r)
 
 
 async def _api_delete(ctx, path: str, params: dict | None = None) -> dict:
-    r = await ctx.http.delete(_db_url(path), params=params or {}, headers=_auth())
+    r = await ctx.http.delete(_db_url(path), params=params or {}, headers=await _auth(ctx))
     if not r.ok:
         return _extract_error(r)
     return _safe_body(r)
 
 
 async def _api_patch(ctx, path: str, params: dict, data: dict) -> dict:
-    r = await ctx.http.patch(_db_url(path), params=params, json=data, headers=_auth())
+    r = await ctx.http.patch(_db_url(path), params=params, json=data, headers=await _auth(ctx))
     if not r.ok:
         return _extract_error(r)
     return _safe_body(r)
@@ -291,7 +283,7 @@ def build_conn_info(conn: dict) -> dict:
 
 ext = Extension(
     "sql-db",
-    version="2.18.4",
+    version="2.19.0",
     capabilities=["sql-db:read", "sql-db:write"],
     display_name="SQL Database",
     description=(
@@ -450,12 +442,38 @@ chat = ChatExtension(
 )
 
 
+# ─── Secrets (app-scope: developer-owned, shared by all users) ────────────── #
+
+ext.secret(
+    name="db_service_key",
+    description=(
+        "API key the SQL backend service authenticates with. Shared across "
+        "all users; set once in Developer Portal → Secrets."
+    ),
+    scope="app",
+    required=True,
+    max_bytes=256,
+)(lambda: None)
+
+ext.secret(
+    name="sql_db_encryption_key",
+    description=(
+        "Fernet key used to encrypt saved DB passwords before they reach the "
+        "backend. Must match the backend's key. Shared across all users; set "
+        "once in Developer Portal → Secrets."
+    ),
+    scope="app",
+    required=True,
+    max_bytes=256,
+)(lambda: None)
+
+
 # ─── Lifecycle ────────────────────────────────────────────────────────────── #
 
 @ext.health_check
 async def health(ctx) -> dict:
     try:
-        r = await ctx.http.get(_db_url("/health"), headers=_auth())
+        r = await ctx.http.get(_db_url("/health"), headers=await _auth(ctx))
         if not r.ok:
             return {"status": "degraded", "version": ext.version, "backend": "unreachable"}
         body = r.body if isinstance(r.body, dict) else {}
