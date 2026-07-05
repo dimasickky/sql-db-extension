@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.2",
+  "sdk_version": "5.9.3",
   "app_id": "sql-db",
   "version": "2.19.0",
   "name": "SQL Database",
