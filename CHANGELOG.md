@@ -4,6 +4,15 @@ All notable changes to Imperal SQL DB are documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+## [2.19.1] — 2026-07-07
+
+### Changed
+
+- Maintenance release — rebuilt against `imperal-sdk==5.9.3` (fixes an intermittent `ctx.cache.set()`
+  size-guard bug on large cache entries). No functional or behavioral changes.
+
+---
+
 ## [2.19.0] — 2026-07-01
 
 ### Changed
