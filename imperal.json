@@ -1,8 +1,8 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.3",
+  "sdk_version": "5.9.6",
   "app_id": "sql-db",
-  "version": "2.19.1",
+  "version": "2.19.2",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -2618,19 +2618,31 @@
       "panel_id": "secrets",
       "slot": "right",
       "title": "Secrets",
-      "tree": {}
+      "tree": {},
+      "icon": "KeyRound",
+      "refresh": "manual",
+      "center_overlay": false
     },
     {
       "panel_id": "sidebar",
       "slot": "left",
       "title": "SQL DB",
-      "tree": {}
+      "tree": {},
+      "icon": "Database",
+      "refresh": "on_event:sql-db.connection.added,sql-db.connection.deleted,sql-db.connection.selected,sql-db.sql.ddl_executed,sql-db.table.touched,sql-db.schema.indexed",
+      "center_overlay": false,
+      "default_width": 260,
+      "min_width": 200,
+      "max_width": 400
     },
     {
       "panel_id": "editor",
       "slot": "center",
       "title": "SQL Editor",
-      "tree": {}
+      "tree": {},
+      "icon": "Code",
+      "refresh": "on_event:sql-db.row.inserted,sql-db.row.updated,sql-db.row.deleted",
+      "center_overlay": false
     }
   ]
 }
