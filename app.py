@@ -283,7 +283,7 @@ def build_conn_info(conn: dict) -> dict:
 
 ext = Extension(
     "sql-db",
-    version="2.19.2",
+    version="2.19.3",
     capabilities=["sql-db:read", "sql-db:write"],
     display_name="SQL Database",
     description=(

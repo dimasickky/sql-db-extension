@@ -4,6 +4,14 @@ All notable changes to Imperal SQL DB are documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+## [2.19.3] — 2026-07-17
+
+### Changed
+
+- Maintenance release — rebuilt against `imperal-sdk==5.9.9` (picks up upstream fixes for
+  structured error codes, provider tool-name length checks, and declared-capabilities
+  enforcement). No functional or behavioral changes.
+
 ## [2.19.2] — 2026-07-15
 
 ### Changed
