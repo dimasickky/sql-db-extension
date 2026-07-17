@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.9.9",
   "app_id": "sql-db",
-  "version": "2.19.3",
+  "version": "2.19.4",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",

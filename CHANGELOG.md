@@ -4,6 +4,13 @@ All notable changes to Imperal SQL DB are documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+## [2.19.4] — 2026-07-18
+
+### Fixed
+
+- README example usage queries translated from Russian to English, for consistency with
+  the platform's English-first documentation. No code change.
+
 ## [2.19.3] — 2026-07-17
 
 ### Changed

@@ -24,13 +24,13 @@
 It connects to any MySQL / MariaDB database and lets users read, query, and modify data through natural language or raw SQL. Passwords are encrypted with Fernet; queries are validated, classified, and optionally rolled back. Results render inline in a self-contained editor panel — no round-trip through chat required.
 
 ```
-User: "подключись к базе"
+User: "connect to my database"
   → SQL DB prompts for host/user/password, tests, saves.
 
-User: "какие у меня таблицы?"
+User: "what tables do I have?"
   → get_schema → returns table list with row counts and columns.
 
-User: "средняя цена товара по каждой категории"
+User: "average product price per category"
   → nl_to_sql generates SQL → run_query → returns a DataTable.
 
 User types SQL in editor panel, hits Run
