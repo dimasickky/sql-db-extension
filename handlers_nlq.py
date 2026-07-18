@@ -10,6 +10,8 @@ from models_return import *  # noqa: F401,F403 — data_model DTOs
 log = logging.getLogger("sql-db")
 from handlers_query import _resolve
 from schema_guard import load_schema_section
+from imperal_sdk.chat.error_codes import VALIDATION_MISSING_FIELD, INTERNAL
+from error_codes import DB_NO_ACTIVE_CONNECTION, DB_SCHEMA_NOT_CACHED
 
 
 # ─── Models ───────────────────────────────────────────────────────────── #
@@ -47,11 +49,11 @@ async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection.")
+            return ActionResult.error("No active connection.", code=DB_NO_ACTIVE_CONNECTION)
 
         database = conn.get("database", "")
         if not database:
-            return ActionResult.error("No database selected.")
+            return ActionResult.error("No database selected.", code=VALIDATION_MISSING_FIELD)
 
         # Get schema from cache (populated by @ext.skeleton refresh tick).
         # ctx.skeleton.get() raises SkeletonAccessForbidden outside a
@@ -70,7 +72,7 @@ async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
         # Build schema description for LLM
         schema_desc = _build_schema_description(schema_data)
         if not schema_desc:
-            return ActionResult.error("No schema available. Run get_schema first.")
+            return ActionResult.error("No schema available. Run get_schema first.", code=DB_SCHEMA_NOT_CACHED)
 
         # ctx.ai.complete() — correct SDK API, returns CompletionResult.text (str).
         # Calls Imperal Gateway which resolves BYOLLM or platform default.
@@ -90,7 +92,7 @@ async def fn_nl_to_sql(ctx, params: NlToSqlParams) -> ActionResult:
         )
     except Exception as e:
         log.error("nl_to_sql: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 def _build_schema_description(schema_data: dict) -> str:

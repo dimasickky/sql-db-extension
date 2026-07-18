@@ -7,6 +7,8 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from app import chat, ActionResult, _api_get, _api_post, _api_delete, _api_patch, require_user_id, build_conn_info
 from models_return import *  # noqa: F401,F403 — data_model DTOs
 from handlers_query import _resolve
+from imperal_sdk.chat.error_codes import INTERNAL
+from error_codes import DB_NO_ACTIVE_CONNECTION, DB_SAVED_QUERY_NOT_FOUND
 
 log = logging.getLogger("sql-db")
 
@@ -91,7 +93,7 @@ async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection.")
+            return ActionResult.error("No active connection.", code=DB_NO_ACTIVE_CONNECTION)
 
         result = await _api_get(ctx,
             f"/v1/connections/{conn_id}/history",
@@ -118,7 +120,7 @@ async def fn_list_history(ctx, params: ListHistoryParams) -> ActionResult:
         )
     except Exception as e:
         log.error("list_history: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -131,7 +133,7 @@ async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection.")
+            return ActionResult.error("No active connection.", code=DB_NO_ACTIVE_CONNECTION)
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/saved", {
             "user_id": require_user_id(ctx),
@@ -147,7 +149,7 @@ async def fn_save_query(ctx, params: SaveQueryParams) -> ActionResult:
         )
     except Exception as e:
         log.error("save_query: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -159,7 +161,7 @@ async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection.")
+            return ActionResult.error("No active connection.", code=DB_NO_ACTIVE_CONNECTION)
 
         result = await _api_get(ctx,
             f"/v1/connections/{conn_id}/saved",
@@ -182,7 +184,7 @@ async def fn_list_saved(ctx, params: ListSavedParams) -> ActionResult:
         )
     except Exception as e:
         log.error("list_saved: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -194,7 +196,7 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection.")
+            return ActionResult.error("No active connection.", code=DB_NO_ACTIVE_CONNECTION)
 
         saved_list = await _api_get(ctx,
             f"/v1/connections/{conn_id}/saved",
@@ -206,7 +208,7 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
                 target = q
                 break
         if not target:
-            return ActionResult.error("Saved query not found")
+            return ActionResult.error("Saved query not found", code=DB_SAVED_QUERY_NOT_FOUND)
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/query", {
             "user_id": require_user_id(ctx),
@@ -228,7 +230,7 @@ async def fn_run_saved(ctx, params: RunSavedParams) -> ActionResult:
         )
     except Exception as e:
         log.error("run_saved: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -241,7 +243,7 @@ async def fn_delete_saved(ctx, params: DeleteSavedParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection.")
+            return ActionResult.error("No active connection.", code=DB_NO_ACTIVE_CONNECTION)
 
         await _api_delete(ctx,
             f"/v1/connections/{conn_id}/saved/{params.query_id}",
@@ -254,4 +256,4 @@ async def fn_delete_saved(ctx, params: DeleteSavedParams) -> ActionResult:
         )
     except Exception as e:
         log.error("delete_saved: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)

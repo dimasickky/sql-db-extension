@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.20.0 — 2026-07-18 — SDK 5.9.11 + structured error codes on every error path
+
+### Changed
+- Bumped `imperal-sdk` pin `5.9.9` → `5.9.11` (no breaking changes affect this
+  extension — module imports verified clean under the new pin).
+- Every `ActionResult.error(...)` call site (92 total across
+  handlers_connections.py, handlers_execute.py, handlers_history.py,
+  handlers_nlq.py, handlers_query.py, handlers_rows.py) now carries a
+  structured `code=` (SDK 5.9.7+, validator rule V32) instead of relying on
+  prose alone: platform taxonomy codes (`imperal_sdk.chat.error_codes`)
+  where they fit (`VALIDATION_MISSING_FIELD`, `VALIDATION_TYPE_ERROR`,
+  `INTERNAL`), plus a small new app-declared set in `error_codes.py` for
+  DB-specific failures the platform taxonomy doesn't cover
+  (`DB_NO_ACTIVE_CONNECTION`, `DB_CONNECTION_NOT_FOUND`,
+  `DB_CONNECTION_FAILED`, `DB_SCHEMA_NOT_CACHED`, `DB_TABLE_NOT_FOUND`,
+  `DB_COLUMN_NOT_FOUND`, `DB_QUERY_FAILED`, `DB_ZERO_ROWS_AFFECTED`,
+  `DB_SAVED_QUERY_NOT_FOUND`).
+- No behavior change for users — this is diagnosability-only.
+
+All handler modules import clean under the new pin; pyflakes clean on every
+edited file (0 undefined names).
+
 All notable changes to Imperal SQL DB are documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)

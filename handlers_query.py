@@ -11,6 +11,8 @@ from app import (
     _translate_db_error,
 )
 from models_return import *  # noqa: F401,F403 — data_model DTOs
+from imperal_sdk.chat.error_codes import VALIDATION_MISSING_FIELD, VALIDATION_TYPE_ERROR, INTERNAL
+from error_codes import DB_NO_ACTIVE_CONNECTION, DB_QUERY_FAILED, DB_TABLE_NOT_FOUND
 
 
 log = logging.getLogger("sql-db")
@@ -104,14 +106,16 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
         sql = (params.sql or "").strip().rstrip(";")
         if not sql or sql.lower() == "sql":
             return ActionResult.error(
-                "run_query: sql parameter is empty or unresolved placeholder"
+                "run_query: sql parameter is empty or unresolved placeholder",
+                code=VALIDATION_MISSING_FIELD,
             )
 
         first = sql.split(None, 1)[0].upper() if sql else ""
         if first not in _SELECT_VERBS:
             return ActionResult.error(
                 f"run_query accepts read-only verbs only (got '{first}'). "
-                f"Use execute_sql for {first} and other DML/DDL statements."
+                f"Use execute_sql for {first} and other DML/DDL statements.",
+                code=VALIDATION_TYPE_ERROR,
             )
 
         conn_id_in = params.connection_id or ""
@@ -119,7 +123,7 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
             conn_id_in = ""
         conn, conn_id = await _resolve(ctx, conn_id_in)
         if not conn:
-            return ActionResult.error("No active connection. Use add_connection first.")
+            return ActionResult.error("No active connection. Use add_connection first.", code=DB_NO_ACTIVE_CONNECTION)
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/query", {
             "user_id": require_user_id(ctx),
@@ -129,7 +133,7 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(_translate_db_error(result.get("detail", "Query failed")))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Query failed")), code=DB_QUERY_FAILED)
 
         return ActionResult.success(
             data={
@@ -142,7 +146,7 @@ async def fn_run_query(ctx, params: RunQueryParams) -> ActionResult:
         )
     except Exception as e:
         log.error("run_query: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -160,11 +164,11 @@ async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection. Use add_connection first.")
+            return ActionResult.error("No active connection. Use add_connection first.", code=DB_NO_ACTIVE_CONNECTION)
 
         database = params.database or conn.get("database", "")
         if not database:
-            return ActionResult.error("No database specified. Provide database name.")
+            return ActionResult.error("No database specified. Provide database name.", code=VALIDATION_MISSING_FIELD)
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/schema", {
             "user_id": require_user_id(ctx),
@@ -202,7 +206,7 @@ async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
         )
     except Exception as e:
         log.error("get_schema: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -215,7 +219,7 @@ async def fn_explain_query(ctx, params: ExplainParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection.")
+            return ActionResult.error("No active connection.", code=DB_NO_ACTIVE_CONNECTION)
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/explain", {
             "user_id": require_user_id(ctx),
@@ -229,7 +233,7 @@ async def fn_explain_query(ctx, params: ExplainParams) -> ActionResult:
         )
     except Exception as e:
         log.error("explain_query: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -242,7 +246,7 @@ async def fn_dry_run(ctx, params: DryRunParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection.")
+            return ActionResult.error("No active connection.", code=DB_NO_ACTIVE_CONNECTION)
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/dry_run", {
             "user_id": require_user_id(ctx),
@@ -261,7 +265,7 @@ async def fn_dry_run(ctx, params: DryRunParams) -> ActionResult:
         )
     except Exception as e:
         log.error("dry_run: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 class CountTableParams(BaseModel):
@@ -298,11 +302,11 @@ async def fn_count_table(ctx, params: CountTableParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection. Use add_connection first.")
+            return ActionResult.error("No active connection. Use add_connection first.", code=DB_NO_ACTIVE_CONNECTION)
 
         database = params.database or conn.get("database", "")
         if not database:
-            return ActionResult.error("No database specified. Provide database name.")
+            return ActionResult.error("No database specified. Provide database name.", code=VALIDATION_MISSING_FIELD)
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/tables/{params.table}/count", {
             "user_id": require_user_id(ctx),
@@ -312,7 +316,8 @@ async def fn_count_table(ctx, params: CountTableParams) -> ActionResult:
 
         if result.get("status") != "ok":
             return ActionResult.error(
-                f"Row count failed: {result.get('error') or result.get('detail', 'unknown error')}"
+                f"Row count failed: {result.get('error') or result.get('detail', 'unknown error')}",
+                code=DB_QUERY_FAILED,
             )
 
         count = result.get("count", 0)
@@ -328,7 +333,7 @@ async def fn_count_table(ctx, params: CountTableParams) -> ActionResult:
         )
     except Exception as e:
         log.error("count_table: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 # ─── list_tables + get_table_detail (Tier-1 / Tier-2 lightweight schema) ──── #
@@ -387,11 +392,11 @@ async def fn_list_tables(ctx, params: ListTablesParams) -> ActionResult:
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection. Use add_connection first.")
+            return ActionResult.error("No active connection. Use add_connection first.", code=DB_NO_ACTIVE_CONNECTION)
 
         database = params.database or conn.get("database", "")
         if not database:
-            return ActionResult.error("No database specified.")
+            return ActionResult.error("No database specified.", code=VALIDATION_MISSING_FIELD)
 
         result = await _api_post(
             ctx,
@@ -400,7 +405,7 @@ async def fn_list_tables(ctx, params: ListTablesParams) -> ActionResult:
         )
 
         if result.get("status") != "ok":
-            return ActionResult.error(result.get("detail", "Couldn't list tables"))
+            return ActionResult.error(result.get("detail", "Couldn't list tables"), code=DB_QUERY_FAILED)
 
         backend_items = result.get("items", [])
         table_items = [
@@ -437,7 +442,7 @@ async def fn_list_tables(ctx, params: ListTablesParams) -> ActionResult:
         )
     except Exception as e:
         log.error("list_tables: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -454,11 +459,11 @@ async def fn_get_table_detail(ctx, params: GetTableDetailParams) -> ActionResult
     try:
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection. Use add_connection first.")
+            return ActionResult.error("No active connection. Use add_connection first.", code=DB_NO_ACTIVE_CONNECTION)
 
         database = params.database or conn.get("database", "")
         if not database:
-            return ActionResult.error("No database specified.")
+            return ActionResult.error("No database specified.", code=VALIDATION_MISSING_FIELD)
 
         result = await _api_post(
             ctx,
@@ -467,12 +472,13 @@ async def fn_get_table_detail(ctx, params: GetTableDetailParams) -> ActionResult
         )
 
         if result.get("status") != "ok":
-            return ActionResult.error(result.get("detail", "Couldn't fetch table detail"))
+            return ActionResult.error(result.get("detail", "Couldn't fetch table detail"), code=DB_QUERY_FAILED)
 
         if not result.get("exists", True):
             return ActionResult.error(
                 f"Table '{params.table}' does not exist in '{database}'. "
-                "Call list_tables() to find the correct table name."
+                "Call list_tables() to find the correct table name.",
+                code=DB_TABLE_NOT_FOUND,
             )
 
         cols = [
@@ -508,4 +514,4 @@ async def fn_get_table_detail(ctx, params: GetTableDetailParams) -> ActionResult
         )
     except Exception as e:
         log.error("get_table_detail: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)

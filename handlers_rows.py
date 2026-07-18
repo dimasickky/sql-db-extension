@@ -18,6 +18,8 @@ from schema_guard import (
     validate_columns,
     validate_table_exists,
 )
+from imperal_sdk.chat.error_codes import VALIDATION_MISSING_FIELD, VALIDATION_TYPE_ERROR, INTERNAL
+from error_codes import DB_NO_ACTIVE_CONNECTION, DB_TABLE_NOT_FOUND, DB_COLUMN_NOT_FOUND, DB_QUERY_FAILED
 # Bind at module load time (was a lazy import inside the handler); avoids a
 # module re-import edge case so the optimistic sidebar update never silently skips.
 from events import patch_cache_on_dml
@@ -167,22 +169,22 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
     try:
         values, err = _parse_values(params.values_json)
         if err:
-            return ActionResult.error(err)
+            return ActionResult.error(err, code=VALIDATION_TYPE_ERROR)
         if not values:
-            return ActionResult.error("No values to insert")
+            return ActionResult.error("No values to insert", code=VALIDATION_MISSING_FIELD)
 
         # Cache-cheap gate: if we've cached the table's schema, reject
         # unknown columns before the round-trip. Silent no-op when cache
         # is cold (returns {}, validators skip).
         section = await load_schema_section(ctx)
         if (t_err := validate_table_exists(section, params.table)):
-            return ActionResult.error(t_err)
+            return ActionResult.error(t_err, code=DB_TABLE_NOT_FOUND)
         if (c_err := validate_columns(section, params.table, list(values.keys()))):
-            return ActionResult.error(c_err)
+            return ActionResult.error(c_err, code=DB_COLUMN_NOT_FOUND)
 
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection")
+            return ActionResult.error("No active connection", code=DB_NO_ACTIVE_CONNECTION)
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/row", {
             "user_id": require_user_id(ctx),
@@ -193,7 +195,7 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(_translate_db_error(result.get("detail", "Insert failed")))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Insert failed")), code=DB_QUERY_FAILED)
 
         affected = int(result.get("rows_affected", 0) or 0)
         await _bump_sidebar_for_dml(
@@ -211,7 +213,7 @@ async def fn_insert_row(ctx, params: InsertRowParams) -> ActionResult:
         )
     except Exception as e:
         log.error("insert_row: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -224,22 +226,22 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
     try:
         values, err = _parse_values(params.values_json)
         if err:
-            return ActionResult.error(err)
+            return ActionResult.error(err, code=VALIDATION_TYPE_ERROR)
         if not values:
-            return ActionResult.error("No changes to apply")
+            return ActionResult.error("No changes to apply", code=VALIDATION_MISSING_FIELD)
 
         # Cache-cheap gate: unknown table / columns (including pk_col)
         # are rejected before the round-trip.
         section = await load_schema_section(ctx)
         if (t_err := validate_table_exists(section, params.table)):
-            return ActionResult.error(t_err)
+            return ActionResult.error(t_err, code=DB_TABLE_NOT_FOUND)
         referenced = list(values.keys()) + [params.pk_col]
         if (c_err := validate_columns(section, params.table, referenced)):
-            return ActionResult.error(c_err)
+            return ActionResult.error(c_err, code=DB_COLUMN_NOT_FOUND)
 
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection")
+            return ActionResult.error("No active connection", code=DB_NO_ACTIVE_CONNECTION)
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/row", {
             "user_id": require_user_id(ctx),
@@ -251,7 +253,7 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(_translate_db_error(result.get("detail", "Update failed")))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Update failed")), code=DB_QUERY_FAILED)
 
         affected = int(result.get("rows_affected", 0) or 0)
         await _bump_sidebar_for_dml(
@@ -269,7 +271,7 @@ async def fn_update_row(ctx, params: UpdateRowParams) -> ActionResult:
         )
     except Exception as e:
         log.error("update_row: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -282,13 +284,13 @@ async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
     try:
         section = await load_schema_section(ctx)
         if (t_err := validate_table_exists(section, params.table)):
-            return ActionResult.error(t_err)
+            return ActionResult.error(t_err, code=DB_TABLE_NOT_FOUND)
         if (c_err := validate_columns(section, params.table, [params.pk_col])):
-            return ActionResult.error(c_err)
+            return ActionResult.error(c_err, code=DB_COLUMN_NOT_FOUND)
 
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection")
+            return ActionResult.error("No active connection", code=DB_NO_ACTIVE_CONNECTION)
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/row", {
             "user_id": require_user_id(ctx),
@@ -299,7 +301,7 @@ async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(_translate_db_error(result.get("detail", "Delete failed")))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Delete failed")), code=DB_QUERY_FAILED)
 
         affected = int(result.get("rows_affected", 0) or 0)
         await _bump_sidebar_for_dml(
@@ -317,4 +319,4 @@ async def fn_delete_row(ctx, params: DeleteRowParams) -> ActionResult:
         )
     except Exception as e:
         log.error("delete_row: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)

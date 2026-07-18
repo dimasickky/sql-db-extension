@@ -12,6 +12,8 @@ from app import (
 from models_return import *  # noqa: F401,F403 — data_model DTOs
 
 from schema_guard import invalidate as invalidate_schema_cache
+from imperal_sdk.chat.error_codes import VALIDATION_MISSING_FIELD, INTERNAL
+from error_codes import DB_CONNECTION_NOT_FOUND, DB_CONNECTION_FAILED
 
 log = logging.getLogger("sql-db")
 
@@ -118,7 +120,7 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
             "user_id": uid, "connection": conn_info,
         })
         if result.get("status") != "ok":
-            return ActionResult.error(f"Connection failed: {result.get('error', 'unknown')}")
+            return ActionResult.error(f"Connection failed: {result.get('error', 'unknown')}", code=DB_CONNECTION_FAILED)
 
         page = await ctx.store.query(CONN_COLLECTION, where={"user_id": uid}, limit=100)
         for doc in page.data:
@@ -150,7 +152,7 @@ async def fn_add_connection(ctx, params: AddConnectionParams) -> ActionResult:
         )
     except Exception as e:
         log.error("add_connection: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -181,7 +183,7 @@ async def fn_list_connections(ctx, params: NoParams) -> ActionResult:
         )
     except Exception as e:
         log.error("list_connections: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -202,7 +204,8 @@ async def fn_resolve_connection_by_database(
     target = (params.database_name or "").strip()
     if not target or target in ("database_name", "connection_id"):
         return ActionResult.error(
-            "resolve_connection_by_database: database_name is empty or an unresolved placeholder"
+            "resolve_connection_by_database: database_name is empty or an unresolved placeholder",
+            code=VALIDATION_MISSING_FIELD,
         )
     try:
         page = await ctx.store.query(CONN_COLLECTION, where={"user_id": uid}, limit=100)
@@ -224,7 +227,8 @@ async def fn_resolve_connection_by_database(
                 if d.data.get("database") or d.data.get("name")
             })
             return ActionResult.error(
-                f"No connection found for '{target}'. Available: {available or '(none)'}"
+                f"No connection found for '{target}'. Available: {available or '(none)'}",
+                code=DB_CONNECTION_NOT_FOUND,
             )
         entity = ConnectionEntity(
             id=exact.id,
@@ -241,7 +245,7 @@ async def fn_resolve_connection_by_database(
         )
     except Exception as e:
         log.error("resolve_connection_by_database: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -254,7 +258,7 @@ async def fn_test_connection(ctx, params: ConnectionIdParams) -> ActionResult:
     try:
         conn = await get_connection_by_id(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("Connection not found")
+            return ActionResult.error("Connection not found", code=DB_CONNECTION_NOT_FOUND)
         result = await _api_post(ctx, "/v1/connections/test", {
             "user_id": require_user_id(ctx), "connection": build_conn_info(conn),
         })
@@ -263,10 +267,10 @@ async def fn_test_connection(ctx, params: ConnectionIdParams) -> ActionResult:
                 data={"version": result.get("version"), "databases": result.get("databases", [])},
                 summary=f"Connection OK — {result.get('version', '')}",
             )
-        return ActionResult.error(result.get("error", "Connection failed"))
+        return ActionResult.error(result.get("error", "Connection failed"), code=DB_CONNECTION_FAILED)
     except Exception as e:
         log.error("test_connection: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -283,7 +287,7 @@ async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionRes
     try:
         target = await get_connection_by_id(ctx, params.connection_id)
         if not target or target.get("user_id", "") != uid:
-            return ActionResult.error("Connection not found")
+            return ActionResult.error("Connection not found", code=DB_CONNECTION_NOT_FOUND)
         page = await ctx.store.query(CONN_COLLECTION, where={"user_id": uid}, limit=100)
         for doc in page.data:
             is_target = doc.id == params.connection_id
@@ -297,7 +301,7 @@ async def fn_select_connection(ctx, params: SelectConnectionParams) -> ActionRes
         )
     except Exception as e:
         log.error("select_connection: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -314,9 +318,9 @@ async def fn_delete_connection(ctx, params: ConnectionIdParams) -> ActionResult:
     try:
         conn = await get_connection_by_id(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("Connection not found")
+            return ActionResult.error("Connection not found", code=DB_CONNECTION_NOT_FOUND)
         if conn.get("user_id", "") != uid:
-            return ActionResult.error("Connection not found")
+            return ActionResult.error("Connection not found", code=DB_CONNECTION_NOT_FOUND)
         await ctx.store.delete(CONN_COLLECTION, params.connection_id)
         return ActionResult.success(
             data={"connection_id": params.connection_id},
@@ -324,4 +328,4 @@ async def fn_delete_connection(ctx, params: ConnectionIdParams) -> ActionResult:
         )
     except Exception as e:
         log.error("delete_connection: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)

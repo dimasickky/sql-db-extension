@@ -8,6 +8,9 @@ log = logging.getLogger("sql-db")
 
 from app import chat, ActionResult, _api_post, require_user_id, build_conn_info, _translate_db_error
 from models_return import *  # noqa: F401,F403 — data_model DTOs
+from imperal_sdk.chat.error_codes import VALIDATION_MISSING_FIELD, INTERNAL
+from error_codes import (DB_NO_ACTIVE_CONNECTION, DB_TABLE_NOT_FOUND, DB_COLUMN_NOT_FOUND,
+                         DB_QUERY_FAILED, DB_ZERO_ROWS_AFFECTED)
 from handlers_query import _resolve, RunQueryParams, ExplainParams  # noqa: F401
 from schema_guard import (
     load_schema_section,
@@ -92,7 +95,8 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
 
         if not sql:
             return ActionResult.error(
-                "execute_sql: sql parameter is empty"
+                "execute_sql: sql parameter is empty",
+                code=VALIDATION_MISSING_FIELD,
             )
 
         # Schema gate (table + column level). Snapshot is sourced from
@@ -112,7 +116,8 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
                 return ActionResult.error(
                     f"Unknown table(s) referenced: {', '.join(missing)}. "
                     f"Known tables: {', '.join(known)}. "
-                    "Call get_schema() to refresh, then retry."
+                    "Call get_schema() to refresh, then retry.",
+                    code=DB_TABLE_NOT_FOUND,
                 )
 
         # 2) Column-level for INSERT / UPDATE — closes the 1054 hallucination
@@ -130,13 +135,15 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
                     if (c_err := validate_columns(section, table, cols)):
                         return ActionResult.error(
                             f"{c_err} Call get_schema('{table}') and retry "
-                            "with the correct columns."
+                            "with the correct columns.",
+                            code=DB_COLUMN_NOT_FOUND,
                         )
 
         conn, conn_id = await _resolve(ctx, conn_id_in)
         if not conn:
             return ActionResult.error(
-                f"No connection resolved (connection_id='{params.connection_id}')."
+                f"No connection resolved (connection_id='{params.connection_id}').",
+                code=DB_NO_ACTIVE_CONNECTION,
             )
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/execute", {
@@ -147,7 +154,7 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(_translate_db_error(result.get("detail", "Execution failed")))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Execution failed")), code=DB_QUERY_FAILED)
 
         rows_affected = int(result.get("rows_affected", 0) or 0)
         query_type = (result.get("query_type") or "").upper()
@@ -159,7 +166,8 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
         if rows_affected == 0 and query_type in _WRITE_VERBS_AFFECTING_ROWS:
             return ActionResult.error(
                 f"{query_type} executed but 0 rows affected — "
-                f"check VALUES list or WHERE clause"
+                f"check VALUES list or WHERE clause",
+                code=DB_ZERO_ROWS_AFFECTED,
             )
 
         # DDL changed the schema shape — the cached snapshot is now stale.
@@ -207,7 +215,7 @@ async def fn_execute_sql(ctx, params: ExecuteSqlParams) -> ActionResult:
         )
     except Exception as e:
         log.error("execute_sql: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 @chat.function(
@@ -221,26 +229,26 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
     try:
         sql = params.sql.strip().rstrip(";")
         if not sql:
-            return ActionResult.error("Empty SQL")
+            return ActionResult.error("Empty SQL", code=VALIDATION_MISSING_FIELD)
 
         first_word = sql.split()[0].upper()
         is_read = first_word in ("SELECT", "SHOW", "DESCRIBE", "DESC", "EXPLAIN")
 
         conn, conn_id = await _resolve(ctx, params.connection_id)
         if not conn:
-            return ActionResult.error("No active connection.")
+            return ActionResult.error("No active connection.", code=DB_NO_ACTIVE_CONNECTION)
 
         if first_word == "EXPLAIN":
             inner_sql = sql[len("EXPLAIN"):].strip()
             if not inner_sql:
-                return ActionResult.error("EXPLAIN requires a query after it.")
+                return ActionResult.error("EXPLAIN requires a query after it.", code=VALIDATION_MISSING_FIELD)
             result = await _api_post(ctx, f"/v1/connections/{conn_id}/explain", {
                 "user_id": require_user_id(ctx),
                 "sql": inner_sql,
                 "connection": build_conn_info(conn),
             })
             if result.get("status") != "ok":
-                return ActionResult.error(_translate_db_error(result.get("detail", "EXPLAIN failed")))
+                return ActionResult.error(_translate_db_error(result.get("detail", "EXPLAIN failed")), code=DB_QUERY_FAILED)
             return ActionResult.success(
                 data={"plan": result.get("plan", []), "sql": inner_sql},
                 summary="EXPLAIN plan",
@@ -254,7 +262,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
                 "connection": build_conn_info(conn),
             })
             if result.get("status") != "ok":
-                return ActionResult.error(_translate_db_error(result.get("detail", "Query failed")))
+                return ActionResult.error(_translate_db_error(result.get("detail", "Query failed")), code=DB_QUERY_FAILED)
             return ActionResult.success(
                 data={
                     "columns": result.get("columns", []),
@@ -273,14 +281,15 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
             "connection": build_conn_info(conn),
         })
         if result.get("status") != "ok":
-            return ActionResult.error(_translate_db_error(result.get("detail", "Execution failed")))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Execution failed")), code=DB_QUERY_FAILED)
 
         rows_affected_editor = int(result.get("rows_affected", 0) or 0)
         query_type_editor = (result.get("query_type") or first_word).upper()
         if rows_affected_editor == 0 and query_type_editor in _WRITE_VERBS_AFFECTING_ROWS:
             return ActionResult.error(
                 f"{query_type_editor} executed but 0 rows affected — "
-                "check VALUES list or WHERE clause"
+                "check VALUES list or WHERE clause",
+                code=DB_ZERO_ROWS_AFFECTED,
             )
 
         # Phase 2 sidebar liveness — classify the executed statement, then:
@@ -328,7 +337,7 @@ async def fn_run_editor_sql(ctx, params: RunEditorSqlParams) -> ActionResult:
         )
     except Exception as e:
         log.error("run_editor_sql: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
 
 
 # ─── execute_batch — multiple statements in ONE transaction ──────────────── #
@@ -369,12 +378,13 @@ async def fn_execute_batch(ctx, params: ExecuteBatchParams) -> ActionResult:
     try:
         sql = (params.sql or "").strip()
         if not sql:
-            return ActionResult.error("execute_batch: sql parameter is empty")
+            return ActionResult.error("execute_batch: sql parameter is empty", code=VALIDATION_MISSING_FIELD)
 
         conn, conn_id = await _resolve(ctx, params.connection_id or "")
         if not conn:
             return ActionResult.error(
-                f"No connection resolved (connection_id='{params.connection_id}')."
+                f"No connection resolved (connection_id='{params.connection_id}').",
+                code=DB_NO_ACTIVE_CONNECTION,
             )
 
         result = await _api_post(ctx, f"/v1/connections/{conn_id}/execute_batch", {
@@ -385,7 +395,7 @@ async def fn_execute_batch(ctx, params: ExecuteBatchParams) -> ActionResult:
         })
 
         if result.get("status") != "ok":
-            return ActionResult.error(_translate_db_error(result.get("detail", "Batch execution failed")))
+            return ActionResult.error(_translate_db_error(result.get("detail", "Batch execution failed")), code=DB_QUERY_FAILED)
 
         stmts = result.get("statements", []) or []
 
@@ -416,4 +426,4 @@ async def fn_execute_batch(ctx, params: ExecuteBatchParams) -> ActionResult:
         )
     except Exception as e:
         log.error("execute_batch: %s", e)
-        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True)
+        return ActionResult.error("An unexpected error occurred. Please try again.", retryable=True, code=INTERNAL)
