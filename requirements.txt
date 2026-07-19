@@ -1,2 +1,2 @@
-imperal-sdk==5.9.11
+imperal-sdk==5.9.12
 cryptography>=42.0.0
