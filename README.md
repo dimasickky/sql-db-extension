@@ -1,5 +1,3 @@
-<div align="center">
-
 # Imperal SQL DB
 
 ### Your personal AI-powered SQL workbench on Imperal Cloud.
@@ -7,13 +5,11 @@
 **Connect. Query. Explore. — in plain English or pure SQL.**
 
 [![Platform](https://img.shields.io/badge/platform-Imperal%20Cloud-blue)](https://imperal.io)
-[![SDK](https://img.shields.io/badge/imperal--sdk-1.5.7-blue)](https://pypi.org/project/imperal-sdk/)
-[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)]()
-[![License](https://img.shields.io/badge/license-LGPL--3.0-blue)](LICENSE)
+[![SDK](https://img.shields.io/badge/imperal--sdk-5.9.12-blue)](https://pypi.org/project/imperal-sdk/)
+[![Version](https://img.shields.io/badge/version-2.20.1-brightgreen)]()
+[![License](https://img.shields.io/badge/license-LGPL--2.1-blue)](LICENSE)
 
 [Features](#features) | [Functions](#functions) | [Architecture](#architecture) | [Development](#development) | [Platform](https://imperal.io)
-
-</div>
 
 ---
 
@@ -176,7 +172,7 @@ The extension reads these env vars on the platform:
 
 ## Development
 
-Built with [Imperal SDK](https://github.com/imperalcloud/imperal-sdk) v1.5.7.
+Built with [Imperal SDK](https://github.com/imperalcloud/imperal-sdk) v5.9.12.
 
 ```bash
 python3.11 -m venv .venv
@@ -204,14 +200,10 @@ imperal dev
 - **Platform:** [imperal.io](https://imperal.io)
 - **SDK:** [github.com/imperalcloud/imperal-sdk](https://github.com/imperalcloud/imperal-sdk)
 - **PyPI:** [pypi.org/project/imperal-sdk](https://pypi.org/project/imperal-sdk/)
-- **License:** [LGPL-3.0](LICENSE)
+- **License:** [LGPL-2.1](LICENSE)
 
 ---
-
-<div align="center">
 
 **Built for [Imperal Cloud](https://imperal.io)**
 
 *The AI Cloud OS.*
-
-</div>
