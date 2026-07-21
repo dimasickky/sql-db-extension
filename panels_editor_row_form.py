@@ -68,6 +68,20 @@ async def append_row_form(
                         for c in columns if c.get("COLUMN_KEY") == "PRI"), "")
     effective_pk = pk_col or detected_pk
 
+    # pk_col arrives as a panel routing param — never trust it blindly. It
+    # gets interpolated below as a raw SQL identifier (query_sql, and the
+    # delete_row on_click), so it must be checked against the table's real
+    # column names first (already fetched into `columns` above).
+    known_column_names = {c.get("COLUMN_NAME", "") for c in columns}
+    if effective_pk and effective_pk not in known_column_names:
+        children.append(ui.Alert(
+            title="Invalid primary key column",
+            message=f"'{effective_pk}' is not a column of table '{table}'.",
+            type="error",
+        ))
+        append_back_button(children, conn_id, table)
+        return
+
     if mode == "edit" and not effective_pk:
         children.append(ui.Alert(
             title="No primary key",
