@@ -29,7 +29,18 @@ async def _mirror_to_cache(ctx, payload: dict) -> None:
 @ext.skeleton(
     "db_schema",
     alert=True,
-    ttl=300,
+    # 60s, matching the platform's own mail section, down from 300s. The schema
+    # snapshot changes as a RESULT of our own tools (execute_sql running DDL,
+    # switching the active connection), and the SDK's SkeletonClient is
+    # read-only — no ctx.skeleton.invalidate() exists for a handler to call
+    # after a write. The tick is therefore the only thing closing the window,
+    # and 300s meant the model could reason from a schema five minutes stale,
+    # e.g. still naming a table that was just dropped.
+    #
+    # Not lower on purpose: the platform derives its tick from the MINIMUM ttl
+    # across all of a user's sections (floor 15s), so an aggressive value here
+    # speeds up every other extension's refresh too.
+    ttl=60,
     description="Active database schema cache — tables, columns, row counts.",
 )
 async def skeleton_refresh_db_schema(ctx) -> dict:
@@ -65,14 +76,27 @@ async def skeleton_refresh_db_schema(ctx) -> dict:
             ]
             compact_tables.append({"name": t["name"], "rows": t.get("rows", 0), "columns": cols})
 
-        # Store table_names as flat list of strings — SDK compression collapses
-        # list[dict] >5 items to list[N], so we keep names separate for LLM visibility.
-        table_names = [t["name"] for t in compact_tables]
+        # There used to be a separate `table_names` field here, justified by a
+        # comment about "better LLM visibility" for a flat string list. Both
+        # halves of that were wrong, and the kernel's own renderer says so.
+        #
+        # _render_skeleton_value expands a list of DICTS into its item fields
+        # but collapses a list of SCALARS to a shape hint, so the field rendered
+        # as `table_names=list[42]` — the names never reached the model. Joining
+        # them into one string does render, but _render_scalar caps a string at
+        # 60 chars, which silently truncates the sample AND any "+N more" tail
+        # placed after it.
+        #
+        # It was redundant regardless: `tables` below is a list of dicts with a
+        # `name` key, so the kernel already renders real table names inline
+        # (`tables=[wp_posts rows=1200; ...]`, first 10 then "(+N more)").
+        # `table_count` carries the true total and list_tables() serves the full
+        # catalogue. So the field is gone rather than reshaped — fewer bytes on
+        # a per-user hot loop, and nothing lost.
         payload = {
             "database":    database,
             "connection":  conn.get("name", ""),
             "table_count": len(compact_tables),
-            "table_names": table_names,  # flat string list — better LLM visibility
             "tables":      compact_tables,
         }
         await _mirror_to_cache(ctx, payload)

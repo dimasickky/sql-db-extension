@@ -1,5 +1,31 @@
 # Changelog
 
+## v2.20.2 — 2026-07-27 — Skeleton: correct a wrong assumption
+
+### Removed
+
+- **Skeleton `table_names` field.** v2.19.0 added it on the theory that a flat
+  string list is "more visible after compression" than `tables: list[dict]`.
+  That was backwards, and the platform's own projection code says so: a list of
+  *dicts* is expanded into its item fields, while a list of plain *scalars*
+  collapses to a bare `list[42]` shape hint. So `table_names` was the one form
+  that could not be read, while `tables` was already rendering real table names
+  inline all along. Joining the names into a single string does render, but a
+  bare string is capped at 60 characters, which silently truncates the sample
+  *and* any "+N more" tail after it. The field is therefore removed rather than
+  reshaped: `table_count` carries the true total, `tables` shows the names, and
+  `list_tables()` serves the full catalogue. Fewer bytes on a per-user hot
+  loop, nothing lost.
+
+### Changed
+
+- Skeleton `ttl` 300s → 60s. This snapshot is invalidated by our *own* tools —
+  `execute_sql` running DDL, switching the active connection — and the SDK's
+  skeleton client is read-only, so a handler has no way to invalidate after a
+  write. The tick is the only thing closing that window, and at 300s the model
+  could reason from a schema five minutes stale, e.g. still naming a table that
+  had just been dropped.
+
 ## v2.20.1 — 2026-07-19 — SDK 5.9.12
 
 ### Changed
