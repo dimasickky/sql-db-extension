@@ -2,7 +2,7 @@
   "manifest_schema_version": 3,
   "sdk_version": "5.9.12",
   "app_id": "sql-db",
-  "version": "2.20.2",
+  "version": "2.21.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -2574,6 +2574,155 @@
         "type": "object"
       },
       "event": "row.deleted",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "tool_sql_db_chat"
+    },
+    {
+      "name": "delete_rows",
+      "description": "Delete SEVERAL rows at once by primary key — the batch version of delete_row. Pass table, pk_col and pk_values (list). Requires an explicit confirm=true on a second call; the first call only previews which keys would be deleted. Each row is deleted as its own parameterized statement, so this is NOT one transaction: if some fail, the others still go through and each is reported.",
+      "action_type": "destructive",
+      "chain_callable": true,
+      "effects": [
+        "delete:row"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Delete several rows by primary key.",
+        "properties": {
+          "table": {
+            "description": "Table name",
+            "title": "Table",
+            "type": "string"
+          },
+          "pk_col": {
+            "description": "Primary key column name",
+            "title": "Pk Col",
+            "type": "string"
+          },
+          "pk_values": {
+            "description": "Primary key values of the rows to delete, e.g. ['12', '15', '18'].",
+            "items": {
+              "type": "string"
+            },
+            "title": "Pk Values",
+            "type": "array"
+          },
+          "confirm": {
+            "default": false,
+            "description": "Set true on a second call to actually delete. First call (default) only previews which primary keys would be deleted.",
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "connection_id": {
+            "default": "",
+            "description": "Connection ID (empty = active)",
+            "title": "Connection Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "pk_col"
+        ],
+        "title": "DeleteRowsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "BulkRowItem": {
+            "description": "One row of a bulk delete — which pk value, and what happened to it.",
+            "properties": {
+              "pk_value": {
+                "title": "Pk Value",
+                "type": "string"
+              },
+              "ok": {
+                "title": "Ok",
+                "type": "boolean"
+              },
+              "rows_affected": {
+                "default": 0,
+                "title": "Rows Affected",
+                "type": "integer"
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Error"
+              }
+            },
+            "required": [
+              "pk_value",
+              "ok"
+            ],
+            "title": "BulkRowItem",
+            "type": "object"
+          }
+        },
+        "description": "delete_rows — per-pk outcome plus totals.\n\nA bare `rows_affected` would not be honest here: the deletes go out as\nseparate parameterized statements, so they can fail individually, and a\nsingle number cannot say *which* pk survived.",
+        "properties": {
+          "table": {
+            "title": "Table",
+            "type": "string"
+          },
+          "pk_col": {
+            "title": "Pk Col",
+            "type": "string"
+          },
+          "deleted_count": {
+            "title": "Deleted Count",
+            "type": "integer"
+          },
+          "failed_count": {
+            "title": "Failed Count",
+            "type": "integer"
+          },
+          "rows_affected": {
+            "default": 0,
+            "title": "Rows Affected",
+            "type": "integer"
+          },
+          "results": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/BulkRowItem"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "needs_confirmation": {
+            "default": false,
+            "title": "Needs Confirmation",
+            "type": "boolean"
+          },
+          "preview": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Preview",
+            "type": "array"
+          }
+        },
+        "required": [
+          "table",
+          "pk_col",
+          "deleted_count",
+          "failed_count"
+        ],
+        "title": "BulkRowResult",
+        "type": "object"
+      },
+      "event": "rows.deleted",
       "background": false,
       "long_running": false,
       "scopes": [],

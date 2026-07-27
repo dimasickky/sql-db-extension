@@ -1,5 +1,37 @@
 # Changelog
 
+## v2.21.0 — 2026-07-27 — Bulk row delete
+
+### Added
+
+- **`delete_rows`** — delete several rows by primary key in one call. Cleaning
+  up a handful of rows was one call each before this.
+
+### Notes
+
+- **Why a fan-out and not `DELETE ... WHERE pk IN (...)`.** The IN-statement
+  would be atomic and a single round trip, which is genuinely the nicer shape.
+  Building it means interpolating the pk values into SQL text on the client —
+  and the invariant this module opens with is that values are *never*
+  interpolated client-side; the backend parameterizes them. Buying one round
+  trip with a SQL-injection seam, in the one extension where that is least
+  acceptable, is not a trade worth making. So: N parameterized statements
+  against the same `/row` endpoint the single delete uses, bounded at 8 in
+  flight.
+- **The consequence, stated rather than implied: this batch is not one
+  transaction.** If 3 of 20 fail, the other 17 are gone. That is in the tool
+  description and in the per-row result, because a caller is entitled to know
+  it before confirming, not after.
+- **A preview gate, like `delete_branches` and `delete_projects`.** Unlike a
+  note or a task, a deleted SQL row has no trash to come back from. The preview
+  lists the primary keys: the realistic accident is not "I didn't want to
+  delete rows", it is "I didn't realise id 42 was in that list".
+- **Schema validation and the sidebar bump each happen once per batch**, not
+  per row — the table and pk column cannot change between rows, and N
+  optimistic patches would make the panel flicker through intermediate counts.
+- 100-row ceiling, checked before any statement goes out. Past that, a WHERE
+  clause via `execute_sql` is the right tool and the error says so.
+
 ## v2.20.2 — 2026-07-27 — Skeleton: correct a wrong assumption
 
 ### Removed

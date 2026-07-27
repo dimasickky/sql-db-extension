@@ -207,6 +207,31 @@ class RowMutateResult(BaseModel):
     pk: dict[str, Any]
 
 
+class BulkRowItem(BaseModel):
+    """One row of a bulk delete — which pk value, and what happened to it."""
+    pk_value: str
+    ok: bool
+    rows_affected: int = 0
+    error: Optional[str] = None
+
+
+class BulkRowResult(BaseModel):
+    """delete_rows — per-pk outcome plus totals.
+
+    A bare `rows_affected` would not be honest here: the deletes go out as
+    separate parameterized statements, so they can fail individually, and a
+    single number cannot say *which* pk survived.
+    """
+    table: str
+    pk_col: str
+    deleted_count: int
+    failed_count: int
+    rows_affected: int = 0
+    results: list[BulkRowItem] = []
+    needs_confirmation: bool = False
+    preview: list[str] = []
+
+
 class CountTableResult(BaseModel):
     database: str
     table: str
