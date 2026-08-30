@@ -1,5 +1,46 @@
 # Changelog
 
+## v2.22.1 — 2026-08-31 — SDK 5.13.1, standard Back button
+
+### Changed
+
+- **imperal-sdk 5.9.22 → 5.13.1** — new gateway namespaces, unified
+  callable catalog, tray/menu contributions, `tests/`-fixture deploy
+  scan fix.
+- Editor's action bar renders the standard `ui.BackButton` ("← Back")
+  instead of the hand-rolled ghost `ArrowLeft` button — same
+  `__panel__sidebar` target.
+
+## v2.22.0 — 2026-08-16 — SDK 5.9.22, cache-model validator fix
+
+### Changed
+
+- **Bumped `imperal-sdk` 5.9.12 → 5.9.22.** Diffed both wheels line-by-line
+  before touching the pin: every change on the way (`StoreClient.for_user()`,
+  `if_match`/`etag` on Store, retry wrapping in secrets client, new billing
+  fields, CLI fixes) is additive and defaulted — nothing in this module
+  touches any of those surfaces, so this is a pure version bump with zero
+  behavior change.
+
+### Fixed
+
+- **`imperal validate` was failing the build with 6 `CACHE-MODEL-1` errors**
+  that had nothing to do with the SDK bump — they were already there on
+  5.9.12, just never surfaced because this module hadn't been run through
+  `imperal validate` end-to-end before. The static checker resolves a cache
+  model's class name from the AST *at the `ctx.cache.set/get(...)` call
+  site* — either a bare `ClassName(...)` constructor call or a `Name` whose
+  text matches a registered class. It cannot see through
+  `x = ClassName(...); ctx.cache.set(key, x)` — the intermediate variable
+  breaks the pattern, even though the runtime object is exactly the
+  registered class. Six call sites in `skeleton.py`, `handlers_query.py`,
+  `panels.py` (×3) and `events.py` did this. Rewrote each to either
+  construct the model inline as the call argument, or (for the generic
+  `_safe_cache_get(ctx, model_cls, key)` helper) split it into
+  `_safe_cache_get_catalog` / `_safe_cache_get_tables_page` so each call
+  site names its class literally. Zero runtime behavior change — confirmed
+  by a clean `import main` and a 0-error `imperal validate` afterward.
+
 ## v2.21.0 — 2026-07-27 — Bulk row delete
 
 ### Added

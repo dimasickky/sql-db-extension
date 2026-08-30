@@ -93,9 +93,9 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
 
     # ── Action bar (sticky) ───────────────────────────────────────────
     action_bar = ui.Stack([
-        ui.Button("Back", icon="ArrowLeft", variant="ghost", size="sm",
-                  on_click=ui.Call("__panel__sidebar",
-                                  view="main", active_conn_id="")),
+        ui.BackButton(to="Connections",
+                      on_click=ui.Call("__panel__sidebar",
+                                       view="main", active_conn_id="")),
         ui.Text(f"{conn_name} → {database}", variant="caption"),
     ], direction="horizontal", wrap=True, sticky=True)
 
