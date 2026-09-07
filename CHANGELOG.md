@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.24.0 — 2026-09-07 — Automated Tests & Safe Batch Operations
+
+### Added
+
+- **Automated Test Suite** — added `tests/test_batch_operations.py` verifying multi-statement transaction batch execution (`execute_batch`) and primary key bulk deletion preview/confirmation flow (`delete_rows`).
+
 ## v2.23.0 — 2026-09-07 — SDK 5.15.1, SWR caching & cache models
 
 ### Added
