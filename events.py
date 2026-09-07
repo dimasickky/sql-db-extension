@@ -63,7 +63,7 @@ async def patch_cache_on_dml(
         return
     key = cache_key_tables_page(conn_id, database, "", 0, SIDEBAR_PAGE_LIMIT)
     try:
-        page = await ctx.cache.get(key, model=TablesPageCache)
+        page = await ctx.cache.get(key, TablesPageCache)
     except Exception:
         page = None
     if page is None:
@@ -86,7 +86,9 @@ async def patch_cache_on_dml(
     if not changed:
         return
     try:
-        await ctx.cache.set(key, page, ttl_seconds=TABLES_PAGE_CACHE_TTL)
+        # Re-constructed inline so CACHE-MODEL-1 sees a bare
+        # `TablesPageCache(...)` call at the ctx.cache.set() site.
+        await ctx.cache.set(key, TablesPageCache(**page.model_dump()), ttl_seconds=TABLES_PAGE_CACHE_TTL)
     except Exception as exc:
         log.warning("optimistic patch cache write failed: %s", exc)
 

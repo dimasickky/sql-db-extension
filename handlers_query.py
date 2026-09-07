@@ -190,13 +190,20 @@ async def fn_get_schema(ctx, params: GetSchemaParams) -> ActionResult:
                     for c in t.get("columns", [])
                 ]
                 compact.append({"name": t["name"], "rows": t.get("rows", 0), "columns": cols})
-            snap = DbSchemaSnapshot.model_validate({
-                "database": database,
-                "connection": conn.get("name", ""),
-                "table_count": len(compact),
-                "tables": compact,
-            })
-            await ctx.cache.set(SCHEMA_CACHE_KEY, snap, ttl_seconds=SCHEMA_CACHE_TTL)
+            # Constructed inline as the ctx.cache.set() argument — the SDK's
+            # static CACHE-MODEL-1 checker resolves a bare `ClassName(...)`
+            # constructor call at the call site, not a `.model_validate(...)`
+            # result stored in a variable (equivalent for a plain dict).
+            await ctx.cache.set(
+                SCHEMA_CACHE_KEY,
+                DbSchemaSnapshot(
+                    database=database,
+                    connection=conn.get("name", ""),
+                    table_count=len(compact),
+                    tables=compact,
+                ),
+                ttl_seconds=SCHEMA_CACHE_TTL,
+            )
         except Exception as exc:
             log.debug("get_schema: cache mirror failed (non-fatal): %s", exc)
 

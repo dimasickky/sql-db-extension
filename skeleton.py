@@ -20,8 +20,12 @@ log = logging.getLogger("sql-db")
 async def _mirror_to_cache(ctx, payload: dict) -> None:
     """Mirror skeleton payload into ctx.cache for @chat.function write-time validation."""
     try:
-        snap = DbSchemaSnapshot.model_validate(payload)
-        await ctx.cache.set(SCHEMA_CACHE_KEY, snap, ttl_seconds=SCHEMA_CACHE_TTL)
+        # Constructed inline as the ctx.cache.set() argument — the SDK's static
+        # CACHE-MODEL-1 checker resolves a bare `ClassName(...)` constructor call
+        # at the call site, not a `.model_validate(...)` result stored in a
+        # variable. `Model(**data)` and `Model.model_validate(data)` are
+        # equivalent for a plain dict in Pydantic v2 (same validation pipeline).
+        await ctx.cache.set(SCHEMA_CACHE_KEY, DbSchemaSnapshot(**payload), ttl_seconds=SCHEMA_CACHE_TTL)
     except Exception as exc:
         log.warning("schema cache mirror failed: %s", exc)
 

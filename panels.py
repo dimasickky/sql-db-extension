@@ -54,6 +54,7 @@ log = logging.getLogger("sql-db")
 @ext.panel(
     "sidebar", slot="left", title="SQL DB", icon="Database",
     default_width=260, min_width=200, max_width=400,
+    stale_while_revalidate=True, cache_ttl=60,
     refresh="on_event:sql-db.connection.added,sql-db.connection.deleted,"
             "sql-db.connection.selected,sql-db.sql.ddl_executed,"
             "sql-db.table.touched,sql-db.schema.indexed",
@@ -174,9 +175,9 @@ async def _render_schema_block(ctx, conn: dict, conn_id: str, database: str) -> 
     """
     out: list = [ui.Divider(f"Schema: {database}")]
 
-    cat = await _safe_cache_get(ctx, CatalogCache, cache_key_catalog(conn_id))
+    cat = await _safe_cache_get_catalog(ctx, cache_key_catalog(conn_id))
     page_key = cache_key_tables_page(conn_id, database, "", 0, SIDEBAR_PAGE_LIMIT)
-    page = await _safe_cache_get(ctx, TablesPageCache, page_key)
+    page = await _safe_cache_get_tables_page(ctx, page_key)
 
     if cat is None or page is None:
         # Cold cache — populate inline now, write through, render.
@@ -202,10 +203,23 @@ async def _render_schema_block(ctx, conn: dict, conn_id: str, database: str) -> 
     return out
 
 
-async def _safe_cache_get(ctx, model_cls, key):
-    """ctx.cache.get that returns None on any error (miss or backend hiccup)."""
+async def _safe_cache_get_catalog(ctx, key):
+    """ctx.cache.get(CatalogCache) that returns None on any error (miss or backend hiccup).
+
+    Split into a per-model function (rather than a generic model_cls param) so
+    the SDK's static CACHE-MODEL-1 checker can resolve the literal registered
+    class name at the ctx.cache.get() call site.
+    """
     try:
-        return await ctx.cache.get(key, model_cls)
+        return await ctx.cache.get(key, CatalogCache)
+    except Exception:
+        return None
+
+
+async def _safe_cache_get_tables_page(ctx, key):
+    """ctx.cache.get(TablesPageCache) that returns None on any error (miss or backend hiccup)."""
+    try:
+        return await ctx.cache.get(key, TablesPageCache)
     except Exception:
         return None
 
@@ -237,8 +251,11 @@ async def _populate_inline(ctx, conn: dict, conn_id: str, database: str):
                 fetched_at=_now_iso(),
             )
             try:
+                # Re-constructed inline (cheap — tiny model) so the SDK's static
+                # CACHE-MODEL-1 checker sees a bare `CatalogCache(...)` call at
+                # the ctx.cache.set() site, not a Name it can't resolve.
                 await ctx.cache.set(
-                    cache_key_catalog(conn_id), cat_obj,
+                    cache_key_catalog(conn_id), CatalogCache(**cat_obj.model_dump()),
                     ttl_seconds=CATALOG_CACHE_TTL,
                 )
             except Exception as exc:
@@ -278,11 +295,13 @@ async def _populate_inline(ctx, conn: dict, conn_id: str, database: str):
                 fetched_at=_now_iso(),
             )
             try:
+                # Re-constructed inline (cheap) so CACHE-MODEL-1 sees a bare
+                # `TablesPageCache(...)` call at the ctx.cache.set() site.
                 await ctx.cache.set(
                     cache_key_tables_page(
                         conn_id, database, "", 0, SIDEBAR_PAGE_LIMIT,
                     ),
-                    page_obj,
+                    TablesPageCache(**page_obj.model_dump()),
                     ttl_seconds=TABLES_PAGE_CACHE_TTL,
                 )
             except Exception as exc:
