@@ -1,5 +1,4 @@
 {
-  "manifest_schema_version": 3,
   "sdk_version": "5.15.1",
   "app_id": "sql-db",
   "version": "2.24.0",
@@ -2799,5 +2798,7 @@
       "stale_while_revalidate": true,
       "cache_ttl": 60
     }
-  ]
+  ],
+  "schema_version": "1.6.0",
+  "category": "database"
 }
