@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.25.0 — 2026-11-11 — SQL Formatting, Syntax Highlighting & Resilience
+
+### Added
+- **SQL Syntax Highlighting & Formatter** (`sql_parser.py`, `panels_editor.py`) — built-in declarative `ui.Code` preview, format SQL query button, and interactive schema inspection.
+- **On-the-fly CSV Export** (`_editor_result_renderers.py`) — RFC 4180 CSV generation on the fly with download data URI.
+- **Interactive Confirm Dialog** (`panels_editor.py`) — inline safety confirmation dialog before executing DROP, TRUNCATE or destructive row deletes.
+- **Resilience & Error UX** — standard error alerts with `retry=ui.Call(...)` actions across query and schema panels.
+
 ## v2.24.1 — 2026-11-10 — SDK 6.5.3 & Manifest category
 
 ### Changed

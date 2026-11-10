@@ -235,14 +235,42 @@ async def sql_editor(ctx, note_id: str = "", tab: str = "editor",
 # ─── SQL Form ─────────────────────────────────────────────────────────── #
 
 def _append_form(children: list, sql: str, conn_id: str, action: str) -> None:
-    """SQL input form with action selector.
+    """SQL input form with action selector, Format button, and Code preview."""
+    formatted_sql = format_sql(sql) if sql else ""
 
-    `sql` and `action` are placed into Form `defaults` (not only on the child
-    components). FormContext only registers a child value after the user
-    edits it — so the pre-filled TextArea `value=` doesn't travel on submit
-    by itself. Putting them into `defaults` guarantees submission, and the
-    Select/TextArea `value=` props are still used for the visual display.
-    """
+    # If SQL is present and different, or user clicked Format
+    format_actions = []
+    if sql:
+        format_actions.append(
+            ui.Button(
+                "Format SQL",
+                icon="Sparkles",
+                variant="ghost",
+                size="sm",
+                on_click=ui.Call(
+                    "__panel__editor",
+                    note_id=conn_id,
+                    tab="editor",
+                    action=action,
+                    sql=formatted_sql or sql,
+                    edit="1",
+                ),
+            )
+        )
+
+    header_stack = [ui.Text("SQL Query", variant="h4")]
+    if format_actions:
+        header_stack.extend(format_actions)
+
+    children.append(ui.Stack(header_stack, direction="horizontal", justify="between", align="center"))
+
+    if sql:
+        # Code block with syntax highlighting for preview
+        children.append(ui.Card(
+            title="Syntax Preview",
+            content=ui.Code(content=sql, language="sql", line_numbers=True),
+        ))
+
     children.append(ui.Form(
         action="__panel__editor",
         submit_label="Execute",

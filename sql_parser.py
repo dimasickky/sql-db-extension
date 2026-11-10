@@ -4,6 +4,120 @@ from __future__ import annotations
 
 # ─── Statement splitter ───────────────────────────────────────────────── #
 
+_SQL_KEYWORDS = {
+    "SELECT", "FROM", "WHERE", "AND", "OR", "GROUP BY", "ORDER BY", "HAVING",
+    "LIMIT", "OFFSET", "JOIN", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "OUTER JOIN",
+    "CROSS JOIN", "ON", "INSERT INTO", "INSERT", "VALUES", "UPDATE", "SET",
+    "DELETE FROM", "DELETE", "CREATE TABLE", "ALTER TABLE", "DROP TABLE",
+    "TRUNCATE TABLE", "TRUNCATE", "UNION ALL", "UNION", "EXPLAIN", "SHOW",
+    "DESCRIBE", "DESC", "IN", "AS", "BY", "DISTINCT", "COUNT", "SUM", "AVG",
+    "MIN", "MAX", "BETWEEN", "LIKE", "IS NULL", "IS NOT NULL", "CASE", "WHEN",
+    "THEN", "ELSE", "END", "PRIMARY KEY", "FOREIGN KEY", "REFERENCES", "INDEX"
+}
+
+_MAJOR_CLAUSES = [
+    "SELECT", "FROM", "WHERE", "GROUP BY", "ORDER BY", "HAVING",
+    "LIMIT", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "OUTER JOIN",
+    "CROSS JOIN", "JOIN", "SET", "VALUES"
+]
+
+
+def format_sql(sql: str) -> str:
+    """Format and pretty-print SQL with proper indentation and capitalized keywords."""
+    if not sql or not sql.strip():
+        return ""
+    
+    stmts = split_statements(sql)
+    formatted_stmts = []
+    
+    for stmt in stmts:
+        tokens = stmt.split()
+        if not tokens:
+            continue
+        
+        lines: list[str] = []
+        curr_line: list[str] = []
+        indent = "  "
+        
+        i = 0
+        while i < len(tokens):
+            w = tokens[i]
+            upper_w = w.upper().rstrip(",;")
+            
+            # Check 2-word clauses first (e.g. GROUP BY, ORDER BY, LEFT JOIN, INSERT INTO, DELETE FROM)
+            two_word = ""
+            if i + 1 < len(tokens):
+                two_word = f"{tokens[i].upper()} {tokens[i+1].upper().rstrip(',;')}"
+            
+            matched_clause = None
+            advance = 1
+            if two_word in _MAJOR_CLAUSES:
+                matched_clause = two_word
+                advance = 2
+            elif upper_w in _MAJOR_CLAUSES:
+                matched_clause = upper_w
+                advance = 1
+            
+            if matched_clause:
+                if curr_line:
+                    lines.append(" ".join(curr_line))
+                    curr_line = []
+                
+                clause_header = matched_clause
+                if advance == 2 and tokens[i+1].endswith(","):
+                    clause_header += ","
+                elif advance == 1 and w.endswith(","):
+                    clause_header += ","
+                
+                curr_line.append(clause_header)
+                i += advance
+            else:
+                # Check keyword capitalization
+                clean_w = w.strip("`,()").upper()
+                if clean_w in _SQL_KEYWORDS and not (w.startswith("`") or w.startswith("'") or w.startswith('"')):
+                    # preserve punctuation around keyword
+                    formatted_w = w.upper()
+                    curr_line.append(formatted_w)
+                else:
+                    curr_line.append(w)
+                i += 1
+        
+        if curr_line:
+            lines.append(" ".join(curr_line))
+        
+        # Apply indentation to subsequent lines
+        indented_lines = []
+        for idx, line in enumerate(lines):
+            if idx == 0:
+                indented_lines.append(line)
+            else:
+                indented_lines.append(indent + line)
+        
+        formatted_stmts.append("\n".join(indented_lines) + ";")
+    
+    return "\n\n".join(formatted_stmts)
+
+
+def is_dangerous_sql(sql: str) -> tuple[bool, str]:
+    """Check whether SQL contains dangerous or destructive statements (DROP, TRUNCATE, DELETE without WHERE)."""
+    if not sql or not sql.strip():
+        return False, ""
+    
+    stmts = split_statements(sql)
+    for stmt in stmts:
+        fw, is_read, is_explain = classify_sql(stmt)
+        upper = stmt.upper()
+        if fw in ("DROP", "TRUNCATE"):
+            return True, f"High-risk DDL operation ({fw})"
+        if fw == "DELETE" and "WHERE" not in upper:
+            return True, "DELETE statement without a WHERE clause (will delete ALL rows)"
+        if fw == "UPDATE" and "WHERE" not in upper:
+            return True, "UPDATE statement without a WHERE clause (will update ALL rows)"
+        if fw in ("ALTER", "RENAME"):
+            return True, f"Schema modification DDL operation ({fw})"
+    return False, ""
+
+
 def split_statements(sql: str) -> list[str]:
     """Split SQL on `;` outside of quotes. Returns non-empty trimmed statements."""
     parts: list[str] = []

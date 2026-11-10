@@ -5,11 +5,26 @@ beyond backend round-trips for PK lookup / COUNT(*).
 """
 from __future__ import annotations
 
+import csv
+import io
 import re
+import urllib.parse
 
 from imperal_sdk import ui
 
 from app import _api_post, build_conn_info
+
+
+def _generate_csv_data_url(columns: list[str], raw_rows: list[dict]) -> str:
+    """Generate RFC 4180 CSV data URI from columns and rows on the fly."""
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(columns)
+    for row in raw_rows:
+        writer.writerow([row.get(c, "") for c in columns])
+    csv_text = buf.getvalue()
+    encoded = urllib.parse.quote(csv_text)
+    return f"data:text/csv;charset=utf-8,{encoded}"
 
 
 # Detect a simple SELECT over a single table. Captures the table identifier
@@ -156,9 +171,10 @@ def render_select_result(
     children: list, conn_id: str, table: str, pk_col: str,
     columns: list, raw_rows: list,
 ) -> None:
-    """Render the DataTable + Insert button for a SELECT result."""
+    """Render the DataTable + Insert button + Export CSV button for a SELECT result."""
+    buttons = []
     if table:
-        children.append(ui.Stack([
+        buttons.append(
             ui.Button(
                 f"Insert new row into {table}",
                 icon="Plus", variant="primary", size="sm",
@@ -167,8 +183,21 @@ def render_select_result(
                     note_id=conn_id, tab="row_form",
                     table=table, mode="insert",
                 ),
-            ),
-        ], direction="horizontal"))
+            )
+        )
+
+    if columns and raw_rows:
+        csv_data_uri = _generate_csv_data_url(columns, raw_rows)
+        buttons.append(
+            ui.Link(
+                label=f"Export CSV ({len(raw_rows)} rows)",
+                href=csv_data_uri,
+                icon="Download",
+            )
+        )
+
+    if buttons:
+        children.append(ui.Stack(buttons, direction="horizontal", gap=2))
 
     if columns and raw_rows:
         cols = [ui.DataColumn(key=c, label=c) for c in columns]

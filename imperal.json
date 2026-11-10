@@ -1,7 +1,7 @@
 {
   "sdk_version": "6.5.3",
   "app_id": "sql-db",
-  "version": "2.24.1",
+  "version": "2.25.0",
   "name": "SQL Database",
   "description": "Connect to MySQL/MariaDB databases, browse schema, run queries, execute DML/DDL, manage saved queries, and insert or update rows.",
   "icon": "icon.svg",
@@ -14,13 +14,13 @@
   "tools": [
     {
       "name": "skeleton_refresh_db_schema",
-      "description": "Active database schema cache — tables, columns, row counts.",
+      "description": "Active database schema cache \u2014 tables, columns, row counts.",
       "scopes": [],
       "parameters": {}
     },
     {
       "name": "skeleton_alert_db_schema",
-      "description": "Alert on database schema changes — tables added or removed.",
+      "description": "Alert on database schema changes \u2014 tables added or removed.",
       "scopes": [],
       "parameters": {
         "old": {
@@ -47,7 +47,7 @@
         "properties": {
           "name": {
             "default": "",
-            "description": "Short connection label (e.g. 'analytics', 'staging'). Optional — derived from host+database when empty.",
+            "description": "Short connection label (e.g. 'analytics', 'staging'). Optional \u2014 derived from host+database when empty.",
             "title": "Name",
             "type": "string"
           },
@@ -325,7 +325,7 @@
             "x-sdl": "entity"
           }
         },
-        "description": "list_connections — a REAL sdl.EntityList[ConnectionEntity] (items=[...], total=N,\nx-sdl='entity-list').",
+        "description": "list_connections \u2014 a REAL sdl.EntityList[ConnectionEntity] (items=[...], total=N,\nx-sdl='entity-list').",
         "properties": {
           "items": {
             "items": {
@@ -662,7 +662,7 @@
     },
     {
       "name": "run_query",
-      "description": "Run a read-only SQL query (SELECT/WITH/SHOW). PREREQUISITE: you must know the EXACT table name AND column names. If you only know the table name — call get_table_detail(table='name') first to get columns. If you don't know the table name — call list_tables(search='keyword') first. NEVER guess column names. Use execute_sql for INSERT/UPDATE/DELETE/DDL.",
+      "description": "Run a read-only SQL query (SELECT/WITH/SHOW). PREREQUISITE: you must know the EXACT table name AND column names. If you only know the table name \u2014 call get_table_detail(table='name') first to get columns. If you don't know the table name \u2014 call list_tables(search='keyword') first. NEVER guess column names. Use execute_sql for INSERT/UPDATE/DELETE/DDL.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -906,7 +906,7 @@
     },
     {
       "name": "count_table",
-      "description": "Get the EXACT row count of a table via SELECT COUNT(*). Use this when the user asks how many rows are in a table — get_schema() returns INFORMATION_SCHEMA estimates which can be wrong. This is the only call that returns a guaranteed-accurate row count.",
+      "description": "Get the EXACT row count of a table via SELECT COUNT(*). Use this when the user asks how many rows are in a table \u2014 get_schema() returns INFORMATION_SCHEMA estimates which can be wrong. This is the only call that returns a guaranteed-accurate row count.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -914,7 +914,7 @@
       "params_schema": {
         "properties": {
           "table": {
-            "description": "Table name to count rows in. Runs a real SELECT COUNT(*) — not an estimate.",
+            "description": "Table name to count rows in. Runs a real SELECT COUNT(*) \u2014 not an estimate.",
             "title": "Table",
             "type": "string"
           },
@@ -973,7 +973,7 @@
     },
     {
       "name": "list_tables",
-      "description": "Search for tables by name. Use this FIRST when user mentions a table by name or asks to find a table — returns just table names, very fast, never truncated. Examples: search='tbl' finds all tables starting with 'tbl', search='invoice' finds invoice-related tables. Then call get_table_detail() for column structure of the specific table you found.",
+      "description": "Search for tables by name. Use this FIRST when user mentions a table by name or asks to find a table \u2014 returns just table names, very fast, never truncated. Examples: search='tbl' finds all tables starting with 'tbl', search='invoice' finds invoice-related tables. Then call get_table_detail() for column structure of the specific table you found.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -1107,7 +1107,7 @@
             "x-sdl": "entity"
           }
         },
-        "description": "list_tables — a REAL sdl.EntityList[TableListEntity] (items=[...], x-sdl='entity-list');\ndatabase / total_matching / search carried as additive typed fields.",
+        "description": "list_tables \u2014 a REAL sdl.EntityList[TableListEntity] (items=[...], x-sdl='entity-list');\ndatabase / total_matching / search carried as additive typed fields.",
         "properties": {
           "items": {
             "items": {
@@ -1482,7 +1482,7 @@
       ],
       "id_projection": "",
       "params_schema": {
-        "description": "Run any SQL from the editor — auto-detects type.",
+        "description": "Run any SQL from the editor \u2014 auto-detects type.",
         "properties": {
           "sql": {
             "description": "SQL statement",
@@ -1630,7 +1630,7 @@
     },
     {
       "name": "execute_batch",
-      "description": "Run MULTIPLE SQL statements at once, sequentially, in ONE transaction. Use this when the user asks to create a table AND fill it, create several tables, or run a multi-statement script — instead of multiple execute_sql calls (execute_sql rejects multi-statement). Pass the whole script in `sql` (statements separated by ';'). Note: DDL (CREATE/ALTER/DROP) auto-commits and cannot be rolled back; DML is transactional.",
+      "description": "Run MULTIPLE SQL statements at once, sequentially, in ONE transaction. Use this when the user asks to create a table AND fill it, create several tables, or run a multi-statement script \u2014 instead of multiple execute_sql calls (execute_sql rejects multi-statement). Pass the whole script in `sql` (statements separated by ';'). Note: DDL (CREATE/ALTER/DROP) auto-commits and cannot be rolled back; DML is transactional.",
       "action_type": "destructive",
       "chain_callable": true,
       "effects": [
@@ -1685,7 +1685,7 @@
             "type": "object"
           }
         },
-        "description": "execute_batch — multiple statements run sequentially in ONE transaction.",
+        "description": "execute_batch \u2014 multiple statements run sequentially in ONE transaction.",
         "properties": {
           "statements_executed": {
             "title": "Statements Executed",
@@ -1724,7 +1724,7 @@
     },
     {
       "name": "nl_to_sql",
-      "description": "Convert a natural language question to SQL. Automatically fetches schema if needed — use this when user asks a question about data in natural language and you need to generate the SQL query. Then call run_query() with the generated SQL.",
+      "description": "Convert a natural language question to SQL. Automatically fetches schema if needed \u2014 use this when user asks a question about data in natural language and you need to generate the SQL query. Then call run_query() with the generated SQL.",
       "action_type": "read",
       "chain_callable": true,
       "effects": [],
@@ -1913,7 +1913,7 @@
             "x-sdl": "entity"
           }
         },
-        "description": "list_history — a REAL sdl.EntityList[HistoryEntity] (items=[...], total=N).",
+        "description": "list_history \u2014 a REAL sdl.EntityList[HistoryEntity] (items=[...], total=N).",
         "properties": {
           "items": {
             "items": {
@@ -2146,7 +2146,7 @@
             "x-sdl": "entity"
           }
         },
-        "description": "list_saved — a REAL sdl.EntityList[SavedQueryEntity] (items=[...], total=N).",
+        "description": "list_saved \u2014 a REAL sdl.EntityList[SavedQueryEntity] (items=[...], total=N).",
         "properties": {
           "items": {
             "items": {
@@ -2325,7 +2325,7 @@
     },
     {
       "name": "_pulse_sql_executed",
-      "description": "Internal side-channel: emit sql.executed after a panel-direct DML so the sidebar schema refreshes. Do not call from chat — for extension-internal use only.",
+      "description": "Internal side-channel: emit sql.executed after a panel-direct DML so the sidebar schema refreshes. Do not call from chat \u2014 for extension-internal use only.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
@@ -2333,7 +2333,7 @@
       ],
       "id_projection": "",
       "params_schema": {
-        "description": "Side-channel to make the platform publish `sql-db.sql.executed`.\n\nCalled via `ctx.extensions.call(...)` from panel handlers that ran DML\nthrough `/execute` or `/row` directly — those bypass @chat.function, so\nthe platform has no way to emit the event automatically. This tiny\nwrite-typed function gives it a hook.",
+        "description": "Side-channel to make the platform publish `sql-db.sql.executed`.\n\nCalled via `ctx.extensions.call(...)` from panel handlers that ran DML\nthrough `/execute` or `/row` directly \u2014 those bypass @chat.function, so\nthe platform has no way to emit the event automatically. This tiny\nwrite-typed function gives it a hook.",
         "properties": {
           "kind": {
             "default": "dml",
@@ -2580,7 +2580,7 @@
     },
     {
       "name": "delete_rows",
-      "description": "Delete SEVERAL rows at once by primary key — the batch version of delete_row. Pass table, pk_col and pk_values (list). Requires an explicit confirm=true on a second call; the first call only previews which keys would be deleted. Each row is deleted as its own parameterized statement, so this is NOT one transaction: if some fail, the others still go through and each is reported.",
+      "description": "Delete SEVERAL rows at once by primary key \u2014 the batch version of delete_row. Pass table, pk_col and pk_values (list). Requires an explicit confirm=true on a second call; the first call only previews which keys would be deleted. Each row is deleted as its own parameterized statement, so this is NOT one transaction: if some fail, the others still go through and each is reported.",
       "action_type": "destructive",
       "chain_callable": true,
       "effects": [
@@ -2631,7 +2631,7 @@
       "return_schema": {
         "$defs": {
           "BulkRowItem": {
-            "description": "One row of a bulk delete — which pk value, and what happened to it.",
+            "description": "One row of a bulk delete \u2014 which pk value, and what happened to it.",
             "properties": {
               "pk_value": {
                 "title": "Pk Value",
@@ -2667,7 +2667,7 @@
             "type": "object"
           }
         },
-        "description": "delete_rows — per-pk outcome plus totals.\n\nA bare `rows_affected` would not be honest here: the deletes go out as\nseparate parameterized statements, so they can fail individually, and a\nsingle number cannot say *which* pk survived.",
+        "description": "delete_rows \u2014 per-pk outcome plus totals.\n\nA bare `rows_affected` would not be honest here: the deletes go out as\nseparate parameterized statements, so they can fail individually, and a\nsingle number cannot say *which* pk survived.",
         "properties": {
           "table": {
             "title": "Table",
@@ -2746,7 +2746,7 @@
   "secrets": [
     {
       "name": "db_service_key",
-      "description": "API key the SQL backend service authenticates with. Shared across all users; set once in Developer Portal → Secrets.",
+      "description": "API key the SQL backend service authenticates with. Shared across all users; set once in Developer Portal \u2192 Secrets.",
       "required": true,
       "write_mode": "user",
       "max_bytes": 256,
@@ -2754,7 +2754,7 @@
     },
     {
       "name": "sql_db_encryption_key",
-      "description": "Fernet key used to encrypt saved DB passwords before they reach the backend. Must match the backend's key. Shared across all users; set once in Developer Portal → Secrets.",
+      "description": "Fernet key used to encrypt saved DB passwords before they reach the backend. Must match the backend's key. Shared across all users; set once in Developer Portal \u2192 Secrets.",
       "required": true,
       "write_mode": "user",
       "max_bytes": 256,
