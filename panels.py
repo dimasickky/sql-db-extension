@@ -119,8 +119,20 @@ async def sql_sidebar(ctx, active_conn_id: str = "", view: str = "main", **kwarg
 
     # ── Connection list ────────────────────────────────────────────────
     if not connections and view != "new_connection":
-        children.append(ui.Empty(message="No connections yet", icon="Database"))
+        children.append(ui.Empty(
+            message="No connections yet — connect to MySQL or PostgreSQL.",
+            icon="Database",
+            action=ui.Call("__panel__sidebar", view="new_connection"),
+        ))
         return ui.Stack(children=children, gap=2)
+
+    # ── Quick Stats Bar ────────────────────────────────────────────────
+    if connections and view == "main":
+        children.append(ui.Stats([
+            ui.Stat(label="Connections", value=len(connections), icon="Database", color="blue"),
+            ui.Stat(label="Active DB", value=active_doc.data.get("database", "—") if active_doc else "—",
+                    icon="CheckCircle2", color="green" if active_doc else "gray"),
+        ], columns=2))
 
     conn_items = []
     for doc in connections:
