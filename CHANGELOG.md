@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.24.1 — 2026-11-10 — SDK 6.5.3 & Manifest category
+
+### Changed
+
+- **imperal-sdk 5.9.12 → 6.5.3** — bumped SDK requirement in `requirements.txt` and `imperal.json`.
+- **Manifest category** — declared `"category": "database"` for platform catalog indexing.
+
 ## v2.24.0 — 2026-09-07 — Automated Tests & Safe Batch Operations
 
 ### Added
